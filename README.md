@@ -15,7 +15,7 @@ put beat markers on your music, auto-edit your looks to the beat and batch-expor
 > For now I recommend picking your poses manually and using aEdit from **Beat Marker** onward –
 > Beat Marker, Beat Edit and Export are ready to use. Feedback on Pose Cut is very welcome via [Issues](../../issues).
 
-## Install (Windows)
+## Install – Windows
 
 **Option A – zip (simplest)**
 1. Download `aEdit_Setup.zip` from [Releases](../../releases) and extract it.
@@ -29,7 +29,17 @@ Install the `.zxp` from Releases with the free [ZXP Installer](https://aescripts
 On first start the panel offers to download ffmpeg. If the panel stays blank, start Premiere once as administrator
 (known Adobe issue) or use option A.
 
-Requirements: Windows 10/11, Premiere Pro 2020 or newer. macOS is not supported yet.
+## Install – macOS
+
+1. Download `aEdit_Setup.zip` from [Releases](../../releases) and double-click it to extract.
+2. Quit Premiere Pro. **Right-click** `INSTALL.command` → **Open** → **Open**
+   (macOS asks once because the script isn't from the App Store).
+3. Premiere Pro → *Window → Extensions → aEdit*.
+
+The installer enables unsigned CEP panels and downloads the right ffmpeg for Apple Silicon or Intel
+into `~/Library/Application Support/aEdit`. An ffmpeg installed with Homebrew is used automatically.
+
+Requirements: Windows 10/11 or macOS 11+, Premiere Pro 2020 or newer.
 
 ## Workflow
 
@@ -37,7 +47,7 @@ Pose Cut each long take → select the music clip → **Beat Marker** → select
 
 ## Build a signed ZXP yourself
 
-Run `BUILD_ZXP.bat` (downloads Adobe's ZXPSignCmd, creates a self-signed certificate once, signs `aEdit/` into `dist/`).
+Windows: run `BUILD_ZXP.bat` (downloads Adobe's ZXPSignCmd, creates a self-signed certificate once, signs `aEdit/` into `dist/`).
 Never commit `cert/` or your password.
 
 ## Credits

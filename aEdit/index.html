@@ -298,27 +298,38 @@
   var cp = nodeReq ? nodeReq("child_process") : null, fs = nodeReq ? nodeReq("fs") : null, Buf = nodeReq ? nodeReq("buffer").Buffer : null;
   var PC = { info: null, feats: null, thumbs: [], segs: [], dropped: {}, dur: 0 };
 
-  // ffmpeg can live next to the panel (zip install) or in %APPDATA%\aEdit (ZXP install: the panel folder is read-only)
-  var USERDIR = (nodeReq && process.env.APPDATA ? process.env.APPDATA.replace(/\\/g, "/") : "") + "/aEdit";
+  // ffmpeg can live next to the panel (zip install) or in a per-user folder (ZXP install: the panel folder is read-only)
+  //   Windows: %APPDATA%\aEdit\bin\ffmpeg.exe    macOS: ~/Library/Application Support/aEdit/bin/ffmpeg
+  var PROC = (typeof process !== "undefined") ? process : null;
+  var IS_MAC = PROC ? PROC.platform === "darwin" : /Mac/.test(navigator.platform);
+  var FF_NAME = IS_MAC ? "ffmpeg" : "ffmpeg.exe";
+  var USERDIR = !PROC ? "" : IS_MAC ? PROC.env.HOME + "/Library/Application Support/aEdit"
+                                       : (PROC.env.APPDATA || "").replace(/\\/g, "/") + "/aEdit";
+  function ffCandidates() {
+    var c = [EXT + "/bin/" + FF_NAME, USERDIR + "/bin/" + FF_NAME];
+    if (IS_MAC) c.push("/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg");   // Homebrew installs
+    return c;
+  }
   function findFfmpeg() {
-    var c = [EXT + "/bin/ffmpeg.exe", USERDIR + "/bin/ffmpeg.exe", EXT + "/bin/ffmpeg"];
+    var c = ffCandidates();
     for (var i = 0; i < c.length; i++) { try { if (fs.existsSync(c[i])) return c[i]; } catch (e) {} }
     return "ffmpeg";   // fall back to PATH
   }
   (function ffmpegCheck() {
     if (!fs) return;
-    var have = [EXT + "/bin/ffmpeg.exe", USERDIR + "/bin/ffmpeg.exe"].some(function (f) { try { return fs.existsSync(f); } catch (e) { return false; } });
+    var have = ffCandidates().some(function (f) { try { return fs.existsSync(f); } catch (e) { return false; } });
     if (have) return;
     $("ff-banner").style.display = "block";
     $("ff-get").onclick = function () {
       var btn = this; btn.disabled = true; $("ff-msg").textContent = "Downloading... this can take a minute.";
-      var ps = cp.spawn("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", EXT + "/bin/get-ffmpeg.ps1", "-Dest", USERDIR], { windowsHide: true });
+      var ps = IS_MAC ? cp.spawn("/bin/bash", [EXT + "/bin/get-ffmpeg.sh", USERDIR])
+                      : cp.spawn("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", EXT + "/bin/get-ffmpeg.ps1", "-Dest", USERDIR], { windowsHide: true });
       var log = "";
       ps.stdout.on("data", function (d) { log += d; var l = String(d).trim().split("\n").pop(); if (l) $("ff-msg").textContent = l.trim(); });
       ps.stderr.on("data", function (d) { log += d; });
-      ps.on("error", function () { btn.disabled = false; $("ff-msg").textContent = "Could not start PowerShell."; });
+      ps.on("error", function () { btn.disabled = false; $("ff-msg").textContent = "Could not start the download script."; });
       ps.on("close", function (code) {
-        if (code === 0 && fs.existsSync(USERDIR + "/bin/ffmpeg.exe")) { $("ff-banner").style.display = "none"; }
+        if (code === 0 && fs.existsSync(USERDIR + "/bin/" + FF_NAME)) { $("ff-banner").style.display = "none"; }
         else { btn.disabled = false; $("ff-msg").textContent = "Download failed. Check the internet connection and try again. " + log.slice(-200); }
       });
     };
@@ -339,7 +350,7 @@
   }
 
   function analyzeClip() {
-    if (!cp) { $("pc-out").textContent = "ERROR: Node.js is not enabled for this panel. Re-run INSTALL.bat."; return; }
+    if (!cp) { $("pc-out").textContent = "ERROR: Node.js is not enabled for this panel. Re-run the installer."; return; }
     save();
     $("pc-out").textContent = "Reading the selected clip...";
     evalScript("aed_clipInfo()", function (res) {
@@ -349,7 +360,7 @@
       PC.dur = PC.info.outP - PC.info.inP;
       var ff = findFfmpeg();
       probeSize(ff, PC.info.path, function (sz) {
-        if (!sz) { $("pc-out").textContent = "ERROR: ffmpeg could not open the file.\n" + PC.info.path + "\nIs ffmpeg installed? Re-run INSTALL.bat."; return; }
+        if (!sz) { $("pc-out").textContent = "ERROR: ffmpeg could not open the file.\n" + PC.info.path + "\nIs ffmpeg installed? Re-run the installer."; return; }
         var portrait = sz.h >= sz.w, W = portrait ? 144 : 256, H = portrait ? 256 : 144, FPS = 15, FS = W * H * 3;
         PC.thumbs = []; PC.dropped = {}; PC.segs = []; PC.feats = null;
         var tc = document.createElement("canvas"); tc.width = 18; tc.height = 32;
@@ -378,7 +389,7 @@
             PC.feats = an.features(); redetect();
             $("pc-out").textContent = "Analysis done (" + frames + " frames). Adjust the sliders, click takes to drop them, then press \"Cut takes\".";
           },
-          error: function (msg) { reset(); $("pc-out").textContent = "ERROR: " + msg + ". Re-run INSTALL.bat."; }
+          error: function (msg) { reset(); $("pc-out").textContent = "ERROR: " + msg + ". Re-run the installer."; }
         });
         $("pc-cancel").onclick = function () { job.cancel(); reset(); $("pc-out").textContent = "Cancelled."; };
       });
