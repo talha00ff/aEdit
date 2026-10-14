@@ -55,6 +55,11 @@ Never commit `cert/` or your password.
 - Uses [FFmpeg](https://ffmpeg.org) (downloaded at install time, not bundled; FFmpeg is licensed under LGPL/GPL).
 - Beat tracking based on the dynamic-programming method by D. Ellis (2007).
 
+## Support
+
+aEdit is free. If it saves you time, you can support its development:
+[GitHub Sponsors](https://github.com/sponsors/talha00ff) · [Patreon](https://www.patreon.com/talha0ff)
+
 ## License
 
 [MIT](LICENSE) © talha0ff
