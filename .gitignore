@@ -1,0 +1,10 @@
+# signing secrets and build output - never commit
+cert/
+*.p12
+tools/
+dist/
+*.zxp
+# ffmpeg is downloaded at install time (GPL, large)
+ffmpeg.exe
+.debug
+.rnd

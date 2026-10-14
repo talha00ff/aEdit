@@ -1,0 +1,45 @@
+# aEdit by talha0ff
+
+A free Adobe Premiere Pro panel for fashion / look-book editors: cut long gimbal takes into poses,
+put beat markers on your music, auto-edit your looks to the beat and batch-export every finished video.
+
+| Tab | What it does |
+|---|---|
+| **1 · Pose Cut** *(beta)* | Splits one long take into usable poses: keeps moments where the subject is centred, sharp and the camera moves smoothly. |
+| **2 · Beat Marker** | Detects BPM and beats of the selected music clip (follows tempo changes), finds beat 1 and writes coloured markers on the clip. Toggle beats 1–4 on/off, shift the downbeat, ÷2 / ×2 tempo. |
+| **3 · Beat Edit** | Lays the selected look clips onto the music's beat markers: random speed range, cuts every 2/4/6 markers, cuts on strong beats, alternates close/wide shots, uses every clip at least once, fills the song from start to end. |
+| **4 · Export** | Every block of back-to-back clips on a track becomes its own video and is queued in Adobe Media Encoder (`brand_1`, `brand_2`, …). |
+
+## Install (Windows)
+
+**Option A – zip (simplest)**
+1. Download `aEdit_Setup.zip` from [Releases](../../releases) and extract it.
+2. Close Premiere Pro, double-click `INSTALL.bat`.
+3. Premiere Pro → *Window → Extensions → aEdit*.
+
+The installer enables unsigned CEP panels for your user (`PlayerDebugMode`) and downloads ffmpeg (~80 MB) once.
+
+**Option B – signed .zxp**
+Install the `.zxp` from Releases with the free [ZXP Installer](https://aescripts.com/learn/zxp-installer/).
+On first start the panel offers to download ffmpeg. If the panel stays blank, start Premiere once as administrator
+(known Adobe issue) or use option A.
+
+Requirements: Windows 10/11, Premiere Pro 2020 or newer. macOS is not supported yet.
+
+## Workflow
+
+Pose Cut each long take → select the music clip → **Beat Marker** → select the look clips → **Beat Edit** → delete the empty takes between your edits → **Export**.
+
+## Build a signed ZXP yourself
+
+Run `BUILD_ZXP.bat` (downloads Adobe's ZXPSignCmd, creates a self-signed certificate once, signs `aEdit/` into `dist/`).
+Never commit `cert/` or your password.
+
+## Credits
+
+- Uses [FFmpeg](https://ffmpeg.org) (downloaded at install time, not bundled; FFmpeg is licensed under LGPL/GPL).
+- Beat tracking based on the dynamic-programming method by D. Ellis (2007).
+
+## License
+
+[MIT](LICENSE) © talha0ff

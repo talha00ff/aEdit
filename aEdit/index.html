@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>aEdit</title>
+<style>
+  :root { --bg:#232323; --panel:#1a1a1a; --line:#3a3a3a; --text:#d6d6d6; --dim:#8a8a8a; --accent:#2d8ceb; --keep:#2fbf5b; --drop:#d64545; }
+  * { box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font:12px "Segoe UI", sans-serif; margin:0; padding:0 12px 12px; }
+  header { display:flex; align-items:baseline; gap:8px; padding:10px 0 8px; }
+  header h1 { font-size:15px; margin:0; color:#fff; letter-spacing:.02em; }
+  header span { color:var(--dim); font-size:11px; }
+  .tabs { display:flex; border-bottom:1px solid var(--line); margin-bottom:10px; }
+  .tab { flex:1; padding:7px 0; text-align:center; cursor:pointer; color:var(--dim); border-bottom:2px solid transparent; user-select:none; }
+  .tab.on { color:#fff; border-bottom-color:var(--accent); }
+  .page { display:none; } .page.on { display:block; }
+  h2 { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--dim); margin:14px 0 6px; font-weight:600; }
+  label { display:block; margin:6px 0; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .row label { display:flex; align-items:center; gap:4px; margin:0; }
+  .sub { margin-left:20px; color:#aaa; }
+  input[type=number] { width:56px; background:var(--panel); color:#fff; border:1px solid #444; padding:3px; }
+  input[type=range] { width:100%; }
+  .slider { margin:8px 0; } .slider .lab { display:flex; justify-content:space-between; color:#bbb; }
+  .btns { display:flex; gap:8px; margin-top:12px; }
+  button { flex:1; padding:9px; background:var(--accent); color:#fff; border:0; border-radius:3px; font-size:13px; cursor:pointer; }
+  button.sec { flex:0 0 auto; background:#3a3a3a; }
+  button:disabled { background:#555; cursor:default; }
+  pre { white-space:pre-wrap; background:var(--panel); border:1px solid #333; padding:8px; min-height:48px; margin-top:12px; }
+  .hint { color:var(--dim); font-size:11px; margin-top:10px; line-height:1.45; }
+  .progress { height:4px; background:#333; border-radius:2px; margin-top:10px; overflow:hidden; display:none; }
+  .progress div { height:100%; width:0; background:var(--accent); transition:width .2s; }
+  #strip { width:100%; height:64px; display:block; margin-top:10px; background:var(--panel); border:1px solid #333; cursor:pointer; }
+  .legend { display:flex; gap:12px; color:var(--dim); font-size:11px; margin-top:4px; }
+  .legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:-1px; }
+  .summary { margin-top:6px; color:#fff; }
+  .shots { display:grid; grid-template-columns:repeat(auto-fill, minmax(58px, 1fr)); gap:6px; margin-top:8px; }
+  .shot { cursor:pointer; border:2px solid #444; border-radius:3px; padding:2px; text-align:center; font-size:10px; line-height:1.3; background:var(--panel); user-select:none; }
+  .shot img { width:100%; display:block; border-radius:2px; }
+  .shot.wide { border-color:var(--accent); } .shot.close { border-color:#e0a030; }
+  .shot b { display:block; } .shot.fixed b::after { content:" ✎"; }
+  /* beat marker tab */
+  .bm-file { background:var(--panel); border:1px solid #333; border-radius:3px; padding:10px; text-align:center; margin-top:4px; }
+  .bm-file b { color:var(--accent); display:block; font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bm-file span { color:var(--dim); font-size:11px; }
+  .bm-bpm { text-align:center; margin:10px 0 2px; }
+  .bm-bpm b { font-size:34px; color:#fff; font-weight:700; letter-spacing:-.01em; }
+  .bm-bpm .sub { display:block; color:var(--dim); font-size:11px; margin:0; }
+  .bm-oct { display:flex; justify-content:center; gap:6px; margin:4px 0 2px; }
+  .bm-oct button { flex:0 0 auto; padding:3px 10px; font-size:11px; background:#3a3a3a; }
+  #bm-wave { width:100%; height:56px; display:block; margin-top:8px; background:var(--panel); border:1px solid #333; }
+  .bm-note { text-align:center; color:#bbb; font-size:11px; margin-top:6px; min-height:14px; }
+  .bm-bar { display:flex; justify-content:center; align-items:center; gap:6px; margin-top:10px; }
+  .bm-beat { width:38px; height:34px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; color:#fff; cursor:pointer; user-select:none; border:2px solid transparent; }
+  .bm-beat.off { background:#333 !important; color:#666; }
+  .bm-arrow { flex:0 0 auto; width:30px; height:30px; padding:0; border-radius:50%; background:#3a3a3a; font-size:11px; }
+  /* export tab */
+  #ex-list { max-height:260px; overflow-y:auto; border:1px solid #333; background:var(--panel); border-radius:3px; margin-top:10px; }
+  .blk { display:flex; align-items:center; gap:6px; padding:5px 6px; border-bottom:1px solid #333; cursor:pointer; }
+  .blk:last-child { border-bottom:0; } .blk:hover { background:#2c2c2c; }
+  .blk .num { width:20px; color:var(--dim); } .blk .tc { flex:1; font-family:Consolas, monospace; font-size:11px; }
+  .blk .len { color:var(--dim); font-size:11px; }
+  .pathrow { display:flex; gap:6px; align-items:center; margin:6px 0; }
+  .pathrow > span:first-child { width:52px; color:#bbb; }
+  .path { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; background:var(--panel); border:1px solid #444; padding:4px 6px; color:#fff; }
+  .path.empty { color:var(--dim); }
+  select.path { padding:3px 4px; font:inherit; }
+  input[type=text] { flex:1; min-width:0; background:var(--panel); color:#fff; border:1px solid #444; padding:4px 6px; }
+  button.mini { flex:0 0 auto; padding:4px 9px; font-size:11px; background:#3a3a3a; }
+
+  /* ================= GLOW THEME ================= */
+  :root { --bg:#0f1116; --panel:#161922; --line:#262b38; --text:#d9dde7; --dim:#7d8496;
+          --accent:#3a8dff; --accent2:#22d3ee; --glow:rgba(58,141,255,.55); --keep:#2fe08a; --drop:#ff4d6d; }
+  body { background:radial-gradient(120% 60% at 50% -10%, #1b2440 0%, var(--bg) 60%) fixed; }
+  header h1 { background:linear-gradient(90deg,#fff,#9cc8ff 60%,var(--accent2)); -webkit-background-clip:text; color:transparent;
+              text-shadow:0 0 18px rgba(58,141,255,.35); }
+  .tabs { border-bottom-color:var(--line); }
+  .tab { transition:color .2s, text-shadow .2s; }
+  .tab:hover { color:#c9d4ea; }
+  .tab.on { color:#fff; border-bottom-color:var(--accent); text-shadow:0 0 10px var(--glow); box-shadow:0 6px 12px -8px var(--glow); }
+  h2 { color:#8fa3c8; }
+  button { background:linear-gradient(135deg,var(--accent),#2563eb 55%,#1e40af); border-radius:6px; font-weight:600; letter-spacing:.01em;
+           box-shadow:0 0 0 1px rgba(120,170,255,.35) inset, 0 4px 18px -4px var(--glow); transition:transform .08s, box-shadow .2s, filter .2s; }
+  button:hover:not(:disabled) { filter:brightness(1.12); box-shadow:0 0 0 1px rgba(160,200,255,.6) inset, 0 0 22px -2px var(--glow); }
+  button:active:not(:disabled) { transform:translateY(1px) scale(.99); }
+  button:disabled { background:#252a36; color:#5d6475; box-shadow:none; }
+  button.sec, button.mini, .bm-oct button, .bm-arrow { background:#1d2230; color:#cfd6e6; box-shadow:0 0 0 1px #2f3647 inset; }
+  button.sec:hover:not(:disabled), button.mini:hover:not(:disabled), .bm-oct button:hover:not(:disabled), .bm-arrow:hover:not(:disabled) {
+           box-shadow:0 0 0 1px rgba(58,141,255,.7) inset, 0 0 14px -3px var(--glow); color:#fff; }
+  button.sec:disabled, button.mini:disabled, .bm-oct button:disabled { background:#171a22; color:#4d5363; box-shadow:0 0 0 1px #232836 inset; }
+  input[type=number], input[type=text], select.path, .path { background:var(--panel); border:1px solid var(--line); border-radius:5px; color:#fff;
+           transition:border-color .2s, box-shadow .2s; }
+  input[type=number]:focus, input[type=text]:focus, select.path:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(58,141,255,.18), 0 0 12px -2px var(--glow); }
+  input[type=checkbox] { accent-color:var(--accent); }
+  input[type=range] { accent-color:var(--accent); }
+  pre { background:rgba(10,12,18,.7); border:1px solid var(--line); border-radius:6px; color:#c8d0e0; }
+  .progress { background:#1d2230; height:5px; border-radius:3px; }
+  .progress div { background:linear-gradient(90deg,var(--accent),var(--accent2)); box-shadow:0 0 10px var(--glow); }
+  #strip, #bm-wave, #ex-list, .bm-file, .shot { border-color:var(--line) !important; border-radius:6px; }
+  #strip, #bm-wave { box-shadow:0 0 20px -12px var(--glow); }
+  .shot.wide { border-color:var(--accent) !important; box-shadow:0 0 10px -3px var(--glow); }
+  .shot.close { border-color:#f0a43a !important; box-shadow:0 0 10px -3px rgba(240,164,58,.6); }
+  .blk { border-bottom-color:var(--line); } .blk:hover { background:#1b2130; }
+  .summary { color:#fff; text-shadow:0 0 8px rgba(47,224,138,.35); }
+  .bm-file { background:linear-gradient(180deg,#171c28,#12151d); }
+  .bm-file b { color:#7fb6ff; text-shadow:0 0 10px rgba(58,141,255,.45); }
+  .bm-bpm b { font-size:40px; background:linear-gradient(180deg,#fff,#a9cbff); -webkit-background-clip:text; color:transparent;
+              filter:drop-shadow(0 0 10px rgba(58,141,255,.55)); }
+  .bm-beat { border-radius:8px; border:1px solid rgba(255,255,255,.18); transition:transform .08s, box-shadow .12s, filter .12s, opacity .2s; }
+  .bm-beat[data-b="1"] { box-shadow:0 0 14px -2px rgba(214,69,69,.75); }
+  .bm-beat[data-b="2"], .bm-beat[data-b="4"] { box-shadow:0 0 14px -2px rgba(61,130,224,.75); }
+  .bm-beat[data-b="3"] { box-shadow:0 0 14px -2px rgba(217,166,46,.75); }
+  .bm-beat:hover { transform:translateY(-1px); filter:brightness(1.12); }
+  .bm-beat.off { box-shadow:none; border-color:#2a2f3c; opacity:.7; }
+  .bm-beat.hit { filter:brightness(1.45); transform:scale(1.08); }
+  .bm-beat[data-b="1"].hit { box-shadow:0 0 26px 2px rgba(255,90,90,.95); }
+  .bm-beat[data-b="2"].hit, .bm-beat[data-b="4"].hit { box-shadow:0 0 26px 2px rgba(90,160,255,.95); }
+  .bm-beat[data-b="3"].hit { box-shadow:0 0 26px 2px rgba(255,200,70,.95); }
+  .bm-beat.off.hit { filter:brightness(1.6); box-shadow:0 0 10px rgba(255,255,255,.15); }
+  ::-webkit-scrollbar { width:8px; height:8px; } ::-webkit-scrollbar-thumb { background:#2a3142; border-radius:4px; }
+  ::-webkit-scrollbar-thumb:hover { background:#3a4560; } ::-webkit-scrollbar-track { background:transparent; }
+</style>
+</head>
+<body>
+  <header><h1>aEdit</h1><span>by talha0ff</span></header>
+  <div id="ff-banner" style="display:none;margin:0 0 10px;padding:9px 10px;border:1px solid rgba(255,190,80,.45);border-radius:6px;background:rgba(255,170,40,.08);box-shadow:0 0 14px -6px rgba(255,170,40,.6)">
+    <div style="color:#ffd28a;margin-bottom:6px">aEdit needs <b>ffmpeg</b> (free, ~80 MB, one time) for Pose Cut, Beat Marker and Beat Edit.</div>
+    <div class="btns" style="margin-top:0"><button id="ff-get">Download ffmpeg</button></div>
+    <div id="ff-msg" style="color:var(--dim);font-size:11px;margin-top:6px"></div>
+  </div>
+  <div class="tabs"><div class="tab on" data-p="pose">1 · Pose Cut <span style="font-size:9px;opacity:.7">(beta)</span></div><div class="tab" data-p="marker">2 · Beat Marker</div><div class="tab" data-p="beat">3 · Beat Edit</div><div class="tab" data-p="export">4 · Export</div></div>
+
+  <!-- ============ POSE CUT ============ -->
+  <section class="page on" id="p-pose">
+    <div class="hint" style="margin-top:0">Select one long take on the timeline. aEdit keeps the moments where the subject is centred, sharp and the camera moves smoothly, and cuts the rest.</div>
+    <div class="btns"><button id="pc-analyze">Analyze selected clip</button><button id="pc-cancel" class="sec" disabled>Cancel</button></div>
+    <div class="progress" id="pc-prog"><div></div></div>
+
+    <canvas id="strip" height="64"></canvas>
+    <div class="legend"><span><i style="background:var(--keep)"></i>keep</span><span><i style="background:var(--drop)"></i>cut</span><span>click a take to drop / restore it</span></div>
+    <div class="summary" id="pc-sum"></div>
+
+    <div class="slider"><div class="lab"><span>Symmetry (stricter →)</span><span id="v-sym">0.70</span></div><input id="pc-sym" type="range" min="0.5" max="0.9" step="0.01" value="0.7"></div>
+    <div class="slider"><div class="lab"><span>Max camera speed (lower = stricter)</span><span id="v-spd">6</span></div><input id="pc-spd" type="range" min="3" max="14" step="0.5" value="6"></div>
+    <div class="slider"><div class="lab"><span>Extend takes</span><span id="v-pad">0.1 s</span></div><input id="pc-pad" type="range" min="0" max="1" step="0.05" value="0.1"></div>
+    <div class="slider"><div class="lab"><span>Shortest take</span><span id="v-min">1.0 s</span></div><input id="pc-min" type="range" min="0.5" max="3" step="0.5" value="1"></div>
+    <div class="slider"><div class="lab"><span>Longest take (max)</span><span id="v-max">5.0 s</span></div><input id="pc-max" type="range" min="2" max="8" step="0.5" value="5"></div>
+    <label><input id="pc-close" type="checkbox"> Close gaps (pack takes back to back)</label>
+
+    <div class="btns"><button id="pc-cut" disabled>Cut takes</button></div>
+    <pre id="pc-out">Select the long take, then press "Analyze selected clip".</pre>
+  </section>
+
+  <!-- ============ BEAT MARKER ============ -->
+  <section class="page" id="p-marker">
+    <div class="hint" style="margin-top:0">Select the music clip on the timeline and analyse it. Markers go on the clip itself, so Beat Edit can use them right away.</div>
+    <div class="btns"><button id="bm-analyze">Analyze selected clip</button></div>
+
+    <div class="bm-file"><b id="bm-name">No music analysed yet</b><span id="bm-meta">—</span></div>
+    <div class="bm-bpm"><b id="bm-bpm">–</b><span class="sub">BPM · 4/4</span></div>
+    <div class="bm-oct"><button id="bm-half" disabled>÷2 half</button><button id="bm-double" disabled>×2 double</button></div>
+    <canvas id="bm-wave" height="56"></canvas>
+    <div class="bm-note" id="bm-note"></div>
+
+    <div class="bm-note" style="color:var(--dim)">Click a beat to switch it on/off · arrows move beat 1</div>
+    <div class="bm-bar">
+      <button class="bm-arrow" id="bm-prev" title="Beat 1 one beat earlier">◀</button>
+      <div class="bm-beat" data-b="1" style="background:#d64545">1</div>
+      <div class="bm-beat" data-b="2" style="background:#3d82e0">2</div>
+      <div class="bm-beat" data-b="3" style="background:#d9a62e">3</div>
+      <div class="bm-beat" data-b="4" style="background:#3d82e0">4</div>
+      <button class="bm-arrow" id="bm-next" title="Beat 1 one beat later">▶</button>
+    </div>
+
+    <label style="margin-top:12px"><input id="bm-replace" type="checkbox"> Also remove other markers on this clip (e.g. from another plugin)</label>
+    <div class="btns"><button id="bm-create" disabled>Create markers on clip</button></div>
+    <div class="btns"><button id="bm-remove" class="sec" style="flex:1">Remove markers</button></div>
+    <pre id="bm-out">Select the music clip, then press "Analyze selected clip".</pre>
+  </section>
+
+  <!-- ============ BEAT EDIT ============ -->
+  <section class="page" id="p-beat">
+    <h2>Basics</h2>
+    <label>Speed range (each clip gets a random speed in it)</label>
+    <div class="row">
+      <label>Slowest % <input id="slow" type="number" value="55" min="1" max="1000"></label>
+      <label>Fastest % <input id="fast" type="number" value="65" min="1" max="1000"></label>
+    </div>
+    <label>Cut every N markers (random)</label>
+    <div class="row">
+      <label><input type="checkbox" class="beat" value="2" checked> 2</label>
+      <label><input type="checkbox" class="beat" value="4" checked> 4</label>
+      <label><input type="checkbox" class="beat" value="6" checked> 6</label>
+    </div>
+
+    <h2>Fill the music</h2>
+    <label><input id="stretch" type="checkbox" checked> Slow clips down if they run short</label>
+    <div class="row sub"><label>Lowest speed % <input id="minspeed" type="number" value="40" min="5" max="100"></label></div>
+    <label><input id="reuse" type="checkbox"> Use a second part of long clips if needed</label>
+
+    <h2>Edit</h2>
+    <label><input id="accent" type="checkbox" checked> Cut on strong beats (beat 1)</label>
+    <label><input id="openclose" type="checkbox" checked> Long clips to open and close</label>
+    <label><input id="useall" type="checkbox" checked> Use every clip at least once</label>
+    <label><input id="alternate" type="checkbox" checked> Alternate close and wide shots</label>
+    <div class="row sub">
+      <label>Wide-shot threshold (white %) <input id="thresh" type="number" min="1" max="99" placeholder="auto"></label>
+      <button id="analyze" class="sec" style="padding:5px 8px;font-size:11px">Analyze shots</button>
+    </div>
+    <div id="shots" class="shots"></div>
+
+    <h2>Other</h2>
+    <label><input id="perclip" type="checkbox" checked> Treat every selected clip as its own video</label>
+    <label><input id="noaudio" type="checkbox" checked> Remove the clips' own audio</label>
+    <label><input id="disable" type="checkbox"> Hide the original clips</label>
+
+    <div class="btns"><button id="check" class="sec">Check</button><button id="run">Build edit</button></div>
+    <pre id="out">Select the look clips (and the music if you like), press "Check", then "Build edit".</pre>
+    <div class="hint">Order: music under the clips → Beat Marker tab → select clips → Check → Build edit.<br>Not happy? Ctrl+Z and press again – every run gives a new random order.</div>
+  </section>
+
+  <!-- ============ EXPORT ============ -->
+  <section class="page" id="p-export">
+    <div class="hint" style="margin-top:0">Each group of back-to-back clips on the track is one video. Delete the empty takes between your edits, scan, and every group is queued in Media Encoder as its own file.</div>
+    <div class="row" style="margin-top:10px">
+      <label>Track V <input id="ex-track" type="number" value="1" min="1"></label>
+      <label>Merge gap s <input id="ex-gap" type="number" value="0.5" min="0" step="0.1"></label>
+      <label>Min length s <input id="ex-min" type="number" value="1" min="0" step="0.5"></label>
+    </div>
+    <div class="btns"><button id="ex-scan">Scan timeline</button></div>
+
+    <div id="ex-list"></div>
+    <div class="row" style="justify-content:space-between;margin-top:4px">
+      <span id="ex-count" style="color:var(--dim)">No videos yet</span>
+      <span><button id="ex-all" class="mini">All</button> <button id="ex-none" class="mini">None</button></span>
+    </div>
+
+    <h2>Render</h2>
+    <div class="pathrow"><span>Preset</span><select id="ex-presetSel" class="path"><option value="">Choose a preset…</option></select><button id="ex-pickPreset" class="mini" title="Browse for an .epr file">Browse</button></div>
+    <div class="pathrow"><span>Output</span><div class="path empty" id="ex-outdir">Choose folder…</div><button id="ex-pickOut" class="mini">…</button></div>
+    <div class="pathrow"><span>Name</span><input type="text" id="ex-base" placeholder="brand name, e.g. marka"></div>
+    <div class="hint" id="ex-namehint" style="margin-top:0"></div>
+    <label><input id="ex-start" type="checkbox" checked> Start the queue in Media Encoder right away</label>
+
+    <div class="btns"><button id="ex-go" disabled>Send to Media Encoder</button></div>
+    <pre id="ex-out">Delete the empty takes, then press "Scan timeline". Click a video in the list to jump to it.</pre>
+  </section>
+
+<script src="js/poseDetect.js"></script>
+<script src="js/shots.js"></script>
+<script src="js/beatDetect.js"></script>
+<script>
+  // show any unexpected script error in the panel instead of failing silently
+  window.onerror = function (msg, src, line) {
+    ["pc-out", "out", "ex-out", "bm-out"].forEach(function (id) { var o = document.getElementById(id); if (o) o.textContent = "ERROR (panel): " + msg + (line ? " (line " + line + ")" : ""); });
+  };
+  function evalScript(code, cb) { window.__adobe_cep__.evalScript(code, cb || function(){}); }
+  var EXT = window.__adobe_cep__.getSystemPath("extension").replace(/\\/g, "/");
+  evalScript('$.evalFile("' + EXT + '/host/main.jsx")');
+  evalScript('$.evalFile("' + EXT + '/host/export.jsx")');
+  evalScript('$.evalFile("' + EXT + '/host/beat.jsx")');
+
+  function $(id) { return document.getElementById(id); }
+  function chk(id) { return $(id).checked ? 1 : 0; }
+  function jsStr(s) { return '"' + String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"'; }
+
+  /* tabs */
+  Array.prototype.forEach.call(document.querySelectorAll(".tab"), function (t) {
+    t.onclick = function () {
+      document.querySelectorAll(".tab").forEach(function (x) { x.classList.toggle("on", x === t); });
+      document.querySelectorAll(".page").forEach(function (p) { p.classList.toggle("on", p.id === "p-" + t.dataset.p); });
+      try { localStorage.setItem("aedit.tab", t.dataset.p); } catch (e) {}
+    };
+  });
+  try { var lastTab = localStorage.getItem("aedit.tab"); if (lastTab) document.querySelector('.tab[data-p="' + lastTab + '"]').click(); } catch (e) {}
+
+  /* remember settings */
+  var FIELDS = ["slow","fast","minspeed","stretch","reuse","accent","openclose","alternate","useall","thresh","perclip","noaudio","disable","pc-sym","pc-pad","pc-min","pc-max","pc-spd","pc-close"];
+  function beats() {
+    return Array.prototype.slice.call(document.querySelectorAll(".beat"))
+      .filter(function (c) { return c.checked; }).map(function (c) { return c.value; }).join(",");
+  }
+  try {
+    var saved = JSON.parse(localStorage.getItem("aedit") || "{}");
+    FIELDS.forEach(function (f) { if (saved[f] !== undefined) { var el = $(f); if (el.type === "checkbox") el.checked = saved[f]; else el.value = saved[f]; } });
+    if (saved.beats) document.querySelectorAll(".beat").forEach(function (c) { c.checked = saved.beats.split(",").indexOf(c.value) >= 0; });
+  } catch (e) {}
+  function save() {
+    try {
+      var s = { beats: beats() };
+      FIELDS.forEach(function (f) { var el = $(f); s[f] = el.type === "checkbox" ? el.checked : el.value; });
+      localStorage.setItem("aedit", JSON.stringify(s));
+    } catch (e) {}
+  }
+
+  /* =================== POSE CUT =================== */
+  var nodeReq = null; try { nodeReq = require; } catch (e) {}
+  var cp = nodeReq ? nodeReq("child_process") : null, fs = nodeReq ? nodeReq("fs") : null, Buf = nodeReq ? nodeReq("buffer").Buffer : null;
+  var PC = { info: null, feats: null, thumbs: [], segs: [], dropped: {}, dur: 0 };
+
+  // ffmpeg can live next to the panel (zip install) or in %APPDATA%\aEdit (ZXP install: the panel folder is read-only)
+  var USERDIR = (nodeReq && process.env.APPDATA ? process.env.APPDATA.replace(/\\/g, "/") : "") + "/aEdit";
+  function findFfmpeg() {
+    var c = [EXT + "/bin/ffmpeg.exe", USERDIR + "/bin/ffmpeg.exe", EXT + "/bin/ffmpeg"];
+    for (var i = 0; i < c.length; i++) { try { if (fs.existsSync(c[i])) return c[i]; } catch (e) {} }
+    return "ffmpeg";   // fall back to PATH
+  }
+  (function ffmpegCheck() {
+    if (!fs) return;
+    var have = [EXT + "/bin/ffmpeg.exe", USERDIR + "/bin/ffmpeg.exe"].some(function (f) { try { return fs.existsSync(f); } catch (e) { return false; } });
+    if (have) return;
+    $("ff-banner").style.display = "block";
+    $("ff-get").onclick = function () {
+      var btn = this; btn.disabled = true; $("ff-msg").textContent = "Downloading... this can take a minute.";
+      var ps = cp.spawn("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", EXT + "/bin/get-ffmpeg.ps1", "-Dest", USERDIR], { windowsHide: true });
+      var log = "";
+      ps.stdout.on("data", function (d) { log += d; var l = String(d).trim().split("\n").pop(); if (l) $("ff-msg").textContent = l.trim(); });
+      ps.stderr.on("data", function (d) { log += d; });
+      ps.on("error", function () { btn.disabled = false; $("ff-msg").textContent = "Could not start PowerShell."; });
+      ps.on("close", function (code) {
+        if (code === 0 && fs.existsSync(USERDIR + "/bin/ffmpeg.exe")) { $("ff-banner").style.display = "none"; }
+        else { btn.disabled = false; $("ff-msg").textContent = "Download failed. Check the internet connection and try again. " + log.slice(-200); }
+      });
+    };
+  })();
+  function setProg(p) { var b = $("pc-prog"); b.style.display = p === null ? "none" : "block"; b.firstChild.style.width = Math.round((p || 0) * 100) + "%"; }
+
+  function probeSize(ff, file, cb) {
+    var p = cp.spawn(ff, ["-hide_banner", "-i", file]), err = "";
+    p.stderr.on("data", function (d) { err += d.toString(); });
+    p.on("error", function () { cb(null); });
+    p.on("close", function () {
+      var m = err.match(/Video:.*?(\d{2,5})x(\d{2,5})/);
+      var rot = /rotate\s*:\s*-?(90|270)/.test(err) || /rotation of -?90/.test(err);
+      if (!m) return cb(null);
+      var w = +m[1], h = +m[2]; if (rot) { var t = w; w = h; h = t; }
+      cb({ w: w, h: h });
+    });
+  }
+
+  function analyzeClip() {
+    if (!cp) { $("pc-out").textContent = "ERROR: Node.js is not enabled for this panel. Re-run INSTALL.bat."; return; }
+    save();
+    $("pc-out").textContent = "Reading the selected clip...";
+    evalScript("aed_clipInfo()", function (res) {
+      if (!res || res.indexOf("OK|") !== 0) { $("pc-out").textContent = res || "No answer from Premiere."; return; }
+      var p = res.split("|");
+      PC.info = { path: p[1], inP: +p[2], outP: +p[3], start: +p[4], end: +p[5], speed: +p[6], track: +p[7], name: p[8], count: +p[9] };
+      PC.dur = PC.info.outP - PC.info.inP;
+      var ff = findFfmpeg();
+      probeSize(ff, PC.info.path, function (sz) {
+        if (!sz) { $("pc-out").textContent = "ERROR: ffmpeg could not open the file.\n" + PC.info.path + "\nIs ffmpeg installed? Re-run INSTALL.bat."; return; }
+        var portrait = sz.h >= sz.w, W = portrait ? 144 : 256, H = portrait ? 256 : 144, FPS = 15, FS = W * H * 3;
+        PC.thumbs = []; PC.dropped = {}; PC.segs = []; PC.feats = null;
+        var tc = document.createElement("canvas"); tc.width = 18; tc.height = 32;
+        $("pc-analyze").disabled = true; $("pc-cancel").disabled = false; $("pc-cut").disabled = true; setProg(0);
+        $("pc-out").textContent = "Analysing " + PC.info.name + " (" + PC.dur.toFixed(0) + " s)..." + (PC.info.count > 1 ? "\nNote: " + PC.info.count + " clips selected, using the first one." : "");
+        function reset() { $("pc-analyze").disabled = false; $("pc-cancel").disabled = true; setProg(null); }
+        if (!window.aEditPose) { reset(); $("pc-out").textContent = "ERROR: analysis module not loaded (js/poseDetect.js)."; return; }
+        var lastFrames = -1, stall = 0;
+        var job = aEditPose.analyzeFile(cp, Buf, ff, PC.info.path, PC.info.inP, PC.dur, W, H, FPS, {
+          progress: function (p, n, total) {
+            setProg(p);
+            if (n !== undefined) $("pc-out").textContent = "Analysing " + PC.info.name + "... " + n + " / " + total + " frames (" + Math.round(p * 100) + "%)";
+          },
+          frame: function (f, i) {
+            if (i % FPS) return;              // one tiny thumbnail per second for the strip
+            var id = tc.getContext("2d").createImageData(18, 32), sx = W / 18, sy = H / 32;
+            for (var y = 0; y < 32; y++) for (var x = 0; x < 18; x++) {
+              var si = ((Math.floor(y * sy)) * W + Math.floor(x * sx)) * 3, di = (y * 18 + x) * 4;
+              id.data[di] = f[si]; id.data[di + 1] = f[si + 1]; id.data[di + 2] = f[si + 2]; id.data[di + 3] = 255;
+            }
+            PC.thumbs.push({ t: i / FPS, img: id });
+          },
+          done: function (an, frames, errTxt) {
+            reset();
+            if (frames < 15) { $("pc-out").textContent = "ERROR: no frames decoded.\n" + errTxt.slice(0, 400); return; }
+            PC.feats = an.features(); redetect();
+            $("pc-out").textContent = "Analysis done (" + frames + " frames). Adjust the sliders, click takes to drop them, then press \"Cut takes\".";
+          },
+          error: function (msg) { reset(); $("pc-out").textContent = "ERROR: " + msg + ". Re-run INSTALL.bat."; }
+        });
+        $("pc-cancel").onclick = function () { job.cancel(); reset(); $("pc-out").textContent = "Cancelled."; };
+      });
+    });
+  }
+
+  function redetect() {
+    var sym = +$("pc-sym").value, pad = +$("pc-pad").value, mn = +$("pc-min").value, mx = +$("pc-max").value, ms = +$("pc-spd").value;
+    $("v-spd").textContent = ms.toFixed(1);
+    if (mx < mn) { mx = mn; $("pc-max").value = mx; }
+    $("v-sym").textContent = sym.toFixed(2); $("v-pad").textContent = pad.toFixed(1) + " s";
+    $("v-min").textContent = mn.toFixed(1) + " s"; $("v-max").textContent = mx.toFixed(1) + " s";
+    if (!PC.feats) return;
+    PC.segs = aEditPose.detect(PC.feats, { sym: sym, pad: pad, takeMin: mn, takeMax: mx, maxSpeed: ms });
+    drawStrip();
+  }
+  function keptSegs() { return PC.segs.filter(function (s, i) { return !PC.dropped[s[0].toFixed(2)]; }); }
+
+  function drawStrip() {
+    var cv = $("strip"), w = cv.clientWidth || 300, h = 64; cv.width = w; cv.height = h;
+    var cx = cv.getContext("2d"); cx.fillStyle = "#1a1a1a"; cx.fillRect(0, 0, w, h);
+    if (!PC.feats) return;
+    var dur = PC.feats.n / PC.feats.fps, X = function (t) { return t / dur * w; };
+    // thumbnails
+    var tw = Math.max(6, Math.round(18 * (h - 12) / 32)), tmp = document.createElement("canvas"); tmp.width = 18; tmp.height = 32;
+    PC.thumbs.forEach(function (th) {
+      tmp.getContext("2d").putImageData(th.img, 0, 0);
+      cx.drawImage(tmp, Math.round(X(th.t)), 0, Math.max(2, Math.ceil(X(1)) + 1), h - 12);
+    });
+    // darken everything, then reveal kept poses
+    cx.fillStyle = "rgba(214,69,69,0.55)"; cx.fillRect(0, 0, w, h - 12);
+    var kept = 0;
+    PC.segs.forEach(function (s) {
+      var x0 = X(s[0]), x1 = X(s[1]), off = PC.dropped[s[0].toFixed(2)];
+      if (!off) {
+        kept += s[1] - s[0];
+        PC.thumbs.forEach(function (th) {
+          if (th.t + 1 > s[0] && th.t < s[1]) { tmp.getContext("2d").putImageData(th.img, 0, 0); cx.save(); cx.beginPath(); cx.rect(x0, 0, x1 - x0, h - 12); cx.clip(); cx.drawImage(tmp, Math.round(X(th.t)), 0, Math.max(2, Math.ceil(X(1)) + 1), h - 12); cx.restore(); }
+        });
+      } else { cx.fillStyle = "rgba(60,60,60,0.75)"; cx.fillRect(x0, 0, x1 - x0, h - 12); }
+      cx.fillStyle = off ? "#666" : "#2fbf5b"; cx.fillRect(x0, h - 10, Math.max(2, x1 - x0 - 1), 8);
+      cx.fillStyle = "#111"; cx.fillRect(Math.round(x1) - 1, h - 10, 1, 8);   // take boundary
+    });
+    // time ticks every 10 s
+    cx.fillStyle = "#8a8a8a"; cx.font = "9px Segoe UI";
+    for (var t = 10; t < dur; t += 10) { cx.fillRect(X(t), h - 12, 1, 3); }
+    var n = keptSegs().length;
+    $("pc-sum").textContent = n + " takes · " + kept.toFixed(1) + " s kept of " + dur.toFixed(1) + " s (" + Math.round(kept / dur * 100) + "%)";
+    $("pc-cut").disabled = n === 0;
+  }
+  $("strip").onclick = function (ev) {
+    if (!PC.feats) return;
+    var r = this.getBoundingClientRect(), t = (ev.clientX - r.left) / r.width * (PC.feats.n / PC.feats.fps);
+    PC.segs.forEach(function (s) { if (t >= s[0] && t <= s[1]) { var k = s[0].toFixed(2); PC.dropped[k] = !PC.dropped[k]; } });
+    drawStrip();
+  };
+  ["pc-sym", "pc-pad", "pc-min", "pc-max", "pc-spd"].forEach(function (id) { $(id).oninput = function () { PC.dropped = {}; redetect(); }; $(id).onchange = save; });
+  $("pc-close").onchange = save;
+  window.addEventListener("resize", drawStrip);
+  $("pc-analyze").onclick = analyzeClip;
+
+  $("pc-cut").onclick = function () {
+    var segs = keptSegs(); if (!segs.length || !PC.info) return;
+    var str = segs.map(function (s) { return (PC.info.inP + s[0]).toFixed(3) + "-" + (PC.info.inP + s[1]).toFixed(3); }).join(";");
+    $("pc-cut").disabled = true; $("pc-out").textContent = "Cutting...";
+    evalScript("aed_cutPoses(" + PC.info.track + "," + PC.info.start + "," + jsStr(str) + "," + chk("pc-close") + ")", function (res) {
+      $("pc-out").textContent = res || "No answer from Premiere.";
+      if (res && res.indexOf("Done") === 0) { PC.feats = null; PC.segs = []; drawStrip(); $("pc-sum").textContent = ""; }
+      else $("pc-cut").disabled = false;
+    });
+  };
+  redetect(); drawStrip();
+
+  /* =================== BEAT EDIT =================== */
+  var nodeFs = fs;
+  var SHOT = { sig: null, items: [], fixed: {} };
+
+  function loadFrame(base, cb) {
+    var cands = [base + ".png", base, base + ".PNG"], tries = 0;
+    (function attempt() {
+      var found = null;
+      if (nodeFs) { for (var i = 0; i < cands.length; i++) { try { if (nodeFs.existsSync(cands[i]) && nodeFs.statSync(cands[i]).size > 0) { found = cands[i]; break; } } catch (e) {} } }
+      else found = cands[0];
+      if (!found) { if (++tries < 40) return setTimeout(attempt, 150); return cb(null); }
+      var img = new Image();
+      img.onload = function () {
+        var w = 96, h = Math.max(1, Math.round(img.height * w / img.width));
+        var cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+        var cx = cv.getContext("2d"); cx.drawImage(img, 0, 0, w, h);
+        try { var d = cx.getImageData(0, 0, w, h).data; cb({ ratio: bkWhiteRatio(d, w, h), thumb: cv.toDataURL("image/jpeg", 0.7) }); }
+        catch (e) { cb(null); }
+      };
+      img.onerror = function () { if (++tries < 40) setTimeout(attempt, 150); else cb(null); };
+      if (nodeFs) { try { img.src = "data:image/png;base64," + nodeFs.readFileSync(found).toString("base64"); } catch (e) { setTimeout(attempt, 150); } }
+      else img.src = "file:///" + found.replace(/^\/+/, "");
+    })();
+  }
+  function classifyAndSend(cb) {
+    var th = parseFloat($("thresh").value);
+    var c = bkClassify(SHOT.items, isNaN(th) ? null : th / 100);
+    var parts = [], nW = 0, nC = 0;
+    SHOT.items.forEach(function (it) {
+      var w = SHOT.fixed.hasOwnProperty(it.key) ? SHOT.fixed[it.key] : c.wide[it.key];
+      it.wide = (w === 0 || w === 1) ? w : -1;
+      if (it.wide === 1) nW++; else if (it.wide === 0) nC++;
+      parts.push(it.key + "=" + it.wide + ":" + it.ratio.toFixed(3));
+    });
+    renderShots();
+    var msg = "Shot analysis: " + nW + " wide, " + nC + " close" + (c.threshold !== null ? " (threshold " + Math.round(c.threshold * 100) + "%)" : "") + ".";
+    if (!c.ok && !Object.keys(SHOT.fixed).length) msg += "\nWARNING: the frames look very alike, the split is weak. Click wrong ones to fix them.";
+    msg += "\nClick a thumbnail to switch it between close and wide.";
+    evalScript('bk_setShots("' + parts.join(";") + '")', function () { cb && cb(msg); });
+  }
+  function renderShots() {
+    var box = $("shots"); box.innerHTML = "";
+    SHOT.items.forEach(function (it) {
+      var d = document.createElement("div");
+      d.className = "shot " + (it.wide === 1 ? "wide" : it.wide === 0 ? "close" : "") + (SHOT.fixed.hasOwnProperty(it.key) ? " fixed" : "");
+      d.innerHTML = (it.thumb ? '<img src="' + it.thumb + '">' : "") + "<b>" + (it.wide === 1 ? "WIDE" : it.wide === 0 ? "CLOSE" : "?") + "</b>" + Math.round(it.ratio * 100) + "%";
+      d.title = "Click: switch close / wide";
+      d.onclick = function () { SHOT.fixed[it.key] = it.wide === 1 ? 0 : 1; classifyAndSend(function (m) { $("out").textContent = m; }); };
+      box.appendChild(d);
+    });
+  }
+  function analyzeShots(cb) {
+    $("out").textContent = "Exporting frames...";
+    evalScript('bk_selSig(' + chk("perclip") + ')', function (sig) {
+      evalScript('bk_exportFrames(' + chk("perclip") + ')', function (res) {
+        if (!res || res.indexOf("OK") !== 0) { $("out").textContent = res || "Could not export frames."; return cb && cb(false); }
+        var lines = res.split("\n").slice(1).filter(function (l) { return l.indexOf("|") > 0; });
+        var items = [], left = lines.length, failed = 0;
+        if (!left) { $("out").textContent = "No frames found."; return cb && cb(false); }
+        lines.forEach(function (l, i) {
+          var p = l.split("|"), key = p[0], base = p[1];
+          items[i] = { key: key, ratio: -1, thumb: null };
+          if (base === "ERR") { failed++; if (--left === 0) done(); return; }
+          loadFrame(base, function (r) {
+            if (r) { items[i].ratio = r.ratio; items[i].thumb = r.thumb; } else failed++;
+            $("out").textContent = "Measuring frames... " + (lines.length - left + 1) + "/" + lines.length;
+            if (--left === 0) done();
+          });
+        });
+        function done() {
+          if (SHOT.sig !== sig) SHOT.fixed = {};
+          SHOT.sig = sig;
+          SHOT.items = items.filter(function (x) { return x.ratio >= 0; });
+          if (SHOT.items.length < 2) { $("out").textContent = "Could not read the frames (" + failed + " errors). Close/wide order unavailable."; return cb && cb(false); }
+          classifyAndSend(function (m) { $("out").textContent = m + (failed ? "\n" + failed + " frames could not be read." : ""); cb && cb(true); });
+        }
+      });
+    });
+  }
+  $("analyze").onclick = function () { save(); analyzeShots(); };
+  $("thresh").onchange = function () { save(); if (SHOT.items.length) classifyAndSend(function (m) { $("out").textContent = m; }); };
+
+  $("check").onclick = function () {
+    save(); $("out").textContent = "Checking...";
+    evalScript('bk_preview("' + beats() + '",' + chk("perclip") + ',' + chk("useall") + ')', function (res) { $("out").textContent = res || "No answer."; });
+  };
+  function doRun(btn) {
+    var slow = parseFloat($("slow").value) || 60, fast = parseFloat($("fast").value) || slow, minsp = parseFloat($("minspeed").value) || 40;
+    btn.disabled = true; $("out").textContent = "Working...";
+    var call = 'bk_run(' + slow + ',' + fast + ',"' + beats() + '",' + chk("noaudio") + ',' + chk("disable") + ',' + chk("perclip") + ',' +
+               chk("accent") + ',' + chk("openclose") + ',' + chk("stretch") + ',' + chk("reuse") + ',' + minsp + ',' + chk("alternate") + ',' + chk("useall") + ')';
+    evalScript(call, function (res) { $("out").textContent = res || "No answer."; btn.disabled = false; });
+  }
+  $("run").onclick = function () {
+    save(); var btn = this;
+    if (!$("alternate").checked) return doRun(btn);
+    evalScript('bk_selSig(' + chk("perclip") + ')', function (sig) {
+      if (SHOT.sig === sig && SHOT.items.length) return classifyAndSend(function () { doRun(btn); });
+      btn.disabled = true;
+      analyzeShots(function () { btn.disabled = false; doRun(btn); });
+    });
+  };
+
+  /* =================== EXPORT =================== */
+  (function () {
+    var EX = { blocks: [], preset: "", outdir: "" }, KEYS = ["ex-track", "ex-gap", "ex-min", "ex-base", "ex-start"];
+    try {
+      var s = JSON.parse(localStorage.getItem("aedit.export") || "{}");
+      KEYS.forEach(function (k) { if (s[k] !== undefined) { var el = $(k); if (el.type === "checkbox") el.checked = s[k]; else el.value = s[k]; } });
+      EX.preset = s.preset || ""; EX.outdir = s.outdir || "";
+    } catch (e) {}
+    function setPath(id, p) { var el = $(id); if (p) { el.textContent = p; el.title = p; el.classList.remove("empty"); } }
+    setPath("ex-outdir", EX.outdir);
+
+    /* presets: list the user's saved AME / Premiere presets, plus anything picked with Browse */
+    var pathMod = nodeReq ? nodeReq("path") : null, osMod = nodeReq ? nodeReq("os") : null;
+    function findPresets() {
+      var found = [];
+      if (!fs || !pathMod || !osMod) return found;
+      var roots = [pathMod.join(osMod.homedir(), "Documents", "Adobe", "Adobe Media Encoder")];
+      function walk(dir, depth) {
+        var list; try { list = fs.readdirSync(dir); } catch (e) { return; }
+        list.forEach(function (n) {
+          var p = pathMod.join(dir, n), st; try { st = fs.statSync(p); } catch (e) { return; }
+          if (st.isDirectory() && depth < 4) walk(p, depth + 1);
+          else if (/\.epr$/i.test(n)) found.push(p);
+        });
+      }
+      roots.forEach(function (r) { walk(r, 0); });
+      return found;
+    }
+    function presetName(p) { return p.split(/[\\\/]/).pop().replace(/\.epr$/i, ""); }
+    function fillPresets() {
+      var sel = $("ex-presetSel"), list = findPresets(), seen = {};
+      if (EX.preset && list.indexOf(EX.preset) < 0) list.unshift(EX.preset);
+      sel.innerHTML = '<option value="">' + (list.length ? "Choose a preset…" : "No saved presets found – use Browse") + "</option>";
+      list.forEach(function (p) {
+        if (seen[p]) return; seen[p] = 1;
+        var o = document.createElement("option"); o.value = p; o.textContent = presetName(p); o.title = p;
+        sel.appendChild(o);
+      });
+      sel.value = EX.preset || "";
+      sel.title = EX.preset || "";
+    }
+    $("ex-presetSel").onchange = function () { EX.preset = this.value; this.title = this.value; exSave(); };
+    fillPresets();
+
+    // native CEP dialogs (more reliable than ExtendScript dialogs); fall back to ExtendScript
+    function cepDialog(folder, title, types) {
+      try {
+        if (window.cep && window.cep.fs && window.cep.fs.showOpenDialogEx) {
+          var r = window.cep.fs.showOpenDialogEx(false, folder, title, "", types || []);
+          return { ok: true, path: (r && r.data && r.data.length) ? r.data[0] : "" };
+        }
+      } catch (e) {}
+      return { ok: false };
+    }
+
+    function namePreview() {
+      var b = ($("ex-base").value || $("ex-base").placeholder || "name").replace(/[\\\/:*?"<>|]/g, "_");
+      var n = EX.blocks.filter(function (x) { return x.on; }).length;
+      $("ex-namehint").textContent = "Files: " + b + "_1, " + b + "_2" + (n > 2 ? " … " + b + "_" + n : "") + "  (numbered in timeline order)";
+    }
+    $("ex-base").addEventListener("input", namePreview);
+    function exSave() {
+      try {
+        var s = { preset: EX.preset, outdir: EX.outdir };
+        KEYS.forEach(function (k) { var el = $(k); s[k] = el.type === "checkbox" ? el.checked : el.value; });
+        localStorage.setItem("aedit.export", JSON.stringify(s));
+      } catch (e) {}
+      refresh();
+    }
+    KEYS.forEach(function (k) { $(k).addEventListener("change", exSave); });
+    function out(t) { $("ex-out").textContent = t; }
+    function fmt(s) { return s >= 60 ? Math.floor(s / 60) + "m " + Math.round(s % 60) + "s" : s.toFixed(1) + "s"; }
+    function parse(r) { try { return JSON.parse(r); } catch (e) { out("ERROR: " + (r || "no answer from Premiere")); return null; } }
+
+    function refresh() {
+      var n = EX.blocks.filter(function (b) { return b.on; }).length;
+      $("ex-count").textContent = EX.blocks.length ? n + " of " + EX.blocks.length + " selected" : "No videos yet";
+      $("ex-go").disabled = !(n && EX.preset && EX.outdir);
+      namePreview();
+    }
+    function render() {
+      var list = $("ex-list"); list.innerHTML = "";
+      EX.blocks.forEach(function (b, i) {
+        var row = document.createElement("div"); row.className = "blk";
+        row.innerHTML = '<input type="checkbox"' + (b.on ? " checked" : "") + '><span class="num">' + (i + 1) + '</span>' +
+          '<span class="tc">' + b.startTC + ' → ' + b.endTC + '</span><span class="len">' + fmt(b.len) + ' · ' + b.clips + '</span>';
+        var cb = row.querySelector("input");
+        cb.onclick = function (e) { e.stopPropagation(); b.on = cb.checked; refresh(); };
+        row.onclick = function () { evalScript("aex_gotoBlock(" + b.start + "," + b.end + ")"); };
+        list.appendChild(row);
+      });
+      refresh();
+    }
+
+    $("ex-scan").onclick = function () {
+      exSave(); out("Scanning...");
+      var t = parseInt($("ex-track").value, 10) || 1, g = parseFloat($("ex-gap").value) || 0, m = parseFloat($("ex-min").value) || 0;
+      evalScript("aex_findBlocks(" + t + "," + g + "," + m + ")", function (r) {
+        var d = parse(r); if (!d) return;
+        if (d.error) return out("ERROR: " + d.error);
+        EX.blocks = d.blocks.map(function (b) { b.on = true; return b; });
+        out(EX.blocks.length + " videos found in \"" + d.sequence + "\" (V" + t + "). Untick any you don't want.");
+        render();
+      });
+    };
+    $("ex-all").onclick = function () { EX.blocks.forEach(function (b) { b.on = true; }); render(); };
+    $("ex-none").onclick = function () { EX.blocks.forEach(function (b) { b.on = false; }); render(); };
+    function gotPreset(p) { if (p && p !== "null") { EX.preset = p; exSave(); fillPresets(); } }
+    function gotFolder(p) { if (p && p !== "null") { EX.outdir = p; setPath("ex-outdir", p); exSave(); } }
+    $("ex-pickPreset").onclick = function () {
+      var r = cepDialog(false, "Choose an export preset (.epr)", ["epr"]);
+      if (r.ok) gotPreset(r.path); else out("ERROR: file dialog not available. Pick the preset from the list.");
+    };
+    $("ex-pickOut").onclick = function () {
+      var r = cepDialog(true, "Choose output folder");
+      if (r.ok) gotFolder(r.path); else out("ERROR: folder dialog not available.");
+    };
+
+    $("ex-go").onclick = function () {
+      var sel = [];
+      EX.blocks.forEach(function (b) { if (b.on) sel.push({ start: b.start, end: b.end, num: sel.length + 1 }); });
+      $("ex-go").disabled = true; out("Sending " + sel.length + " videos to Media Encoder...");
+      var call = "aex_queue(" + jsStr(JSON.stringify(sel)) + "," + jsStr(EX.preset) + "," + jsStr(EX.outdir) + "," +
+                 jsStr($("ex-base").value) + "," + ($("ex-start").checked ? "true" : "false") + ")";
+      evalScript(call, function (r) {
+        refresh(); var d = parse(r); if (!d) return;
+        if (d.error) return out("ERROR: " + d.error);
+        out("Done: " + d.queued + " videos queued in Media Encoder." + (d.errors.length ? "\nProblems:\n" + d.errors.join("\n") : ""));
+      });
+    };
+    refresh();
+  })();
+  /* =================== BEAT MARKER =================== */
+  (function () {
+    // Premiere marker colour indexes: 0 green, 1 red, 2 purple, 3 orange, 4 yellow, 5 white, 6 blue, 7 cyan
+    var COL = { 1: 1, 2: 6, 3: 4, 4: 6 }, CSS = { 1: "#d64545", 2: "#3d82e0", 3: "#d9a62e", 4: "#3d82e0" };
+    var BM = { info: null, samples: null, sr: 11025, res: null, down: 0, on: { 1: true, 2: true, 3: true, 4: true }, size: 0 };
+    try {
+      var sv = JSON.parse(localStorage.getItem("aedit.marker") || "{}");
+      if (sv.on) BM.on = sv.on;
+      if (sv.replace !== undefined) $("bm-replace").checked = sv.replace;
+    } catch (e) {}
+    function bmSave() { try { localStorage.setItem("aedit.marker", JSON.stringify({ on: BM.on, replace: $("bm-replace").checked })); } catch (e) {} }
+    $("bm-replace").onchange = bmSave;
+    function out(t) { $("bm-out").textContent = t; }
+    function beatNo(i) { return ((i - BM.down) % 4 + 4) % 4 + 1; }
+    function activeCount() { if (!BM.res) return 0; var n = 0; for (var i = 0; i < BM.res.times.length; i++) if (BM.on[beatNo(i)]) n++; return n; }
+
+    function paintBeats() {
+      document.querySelectorAll(".bm-beat").forEach(function (el) { el.classList.toggle("off", !BM.on[el.dataset.b]); });
+    }
+    function show() {
+      paintBeats();
+      var r = BM.res;
+      $("bm-half").disabled = $("bm-double").disabled = !r;
+      $("bm-create").disabled = !r || !activeCount();
+      if (!r) return;
+      $("bm-bpm").textContent = r.bpm.toFixed(1);
+      var ext = (BM.info.path.split(".").pop() || "").toUpperCase();
+      $("bm-meta").textContent = ext + " · " + (BM.size / 1048576).toFixed(1) + " MB · " + r.times.length + " beats · " + activeCount() + " markers";
+      startMetro(r.bpm);
+      $("bm-note").textContent = r.variation > 0.03 ? "Some tempo variation detected – markers follow the music." : "Steady tempo.";
+      drawWave();
+    }
+    var metro = null, metroI = 0;
+    function startMetro(bpm) {
+      if (metro) clearInterval(metro);
+      var els = document.querySelectorAll(".bm-beat"); metroI = 0;
+      metro = setInterval(function () {
+        if (document.hidden || !$("p-marker").classList.contains("on")) return;   // idle when the tab is not visible
+        els.forEach(function (e) { e.classList.remove("hit"); });
+        var el = els[metroI % 4]; el.classList.add("hit");
+        setTimeout(function () { el.classList.remove("hit"); }, Math.min(120, 30000 / bpm));
+        metroI++;
+      }, 60000 / bpm);
+    }
+    function drawWave() {
+      var cv = $("bm-wave"), w = cv.clientWidth || 300, h = 56; cv.width = w; cv.height = h;
+      var cx = cv.getContext("2d"); cx.fillStyle = "#1a1a1a"; cx.fillRect(0, 0, w, h);
+      var r = BM.res; if (!r) return;
+      var dur = r.duration, env = r.env, X = function (t) { return t / dur * w; };
+      cx.fillStyle = "#555";
+      var step = env.length / w;
+      for (var x = 0; x < w; x++) {
+        var m = 0; for (var k = Math.floor(x * step); k < Math.floor((x + 1) * step); k++) m = Math.max(m, env[k] || 0);
+        var bh = Math.min(h - 4, m / 6 * (h - 4)); cx.fillRect(x, h - bh, 1, bh);
+      }
+      r.times.forEach(function (t, i) {
+        var b = beatNo(i); if (!BM.on[b]) return;
+        cx.fillStyle = CSS[b]; cx.fillRect(Math.round(X(t)), b === 1 ? 0 : h * 0.45, 1, b === 1 ? h : h * 0.55);
+      });
+    }
+    window.addEventListener("resize", drawWave);
+
+    function run(forceBpm) {
+      var t0 = Date.now();
+      var r = aEditBeat.analyze(BM.samples, BM.sr, forceBpm ? { bpm: forceBpm } : {});
+      if (r.error) { out("ERROR: " + r.error); return; }
+      BM.res = r; BM.down = r.downbeat;
+      show();
+      out("Found " + r.times.length + " beats at " + r.bpm.toFixed(1) + " BPM (" + ((Date.now() - t0) / 1000).toFixed(1) + " s).\n" +
+          "If it feels twice too fast/slow use ÷2 / ×2. If beat 1 is in the wrong place use the arrows.\nThen press \"Create markers on clip\".");
+    }
+
+    $("bm-analyze").onclick = function () {
+      if (!cp) { out("ERROR: Node.js is not enabled for this panel."); return; }
+      out("Reading the selected clip...");
+      evalScript("abm_audioInfo()", function (r) {
+        var d; try { d = JSON.parse(r); } catch (e) { out("ERROR: " + (r || "no answer from Premiere")); return; }
+        if (d.error) { out("ERROR: " + d.error); return; }
+        BM.info = d; BM.res = null;
+        try { BM.size = fs.statSync(d.path).size; } catch (e) { BM.size = 0; }
+        $("bm-name").textContent = d.name; $("bm-name").title = d.path;
+        var dur = d.outP - d.inP;
+        out("Decoding " + d.name + " (" + dur.toFixed(1) + " s)...");
+        $("bm-analyze").disabled = true;
+        var chunks = [], err = "";
+        var p = cp.spawn(findFfmpeg(), ["-v", "error", "-ss", String(d.inP), "-t", String(dur), "-i", d.path, "-vn", "-ac", "1", "-ar", String(BM.sr), "-f", "f32le", "pipe:1"]);
+        p.stdout.on("data", function (c) { chunks.push(c); });
+        p.stderr.on("data", function (c) { err += c.toString(); });
+        p.on("error", function () { $("bm-analyze").disabled = false; out("ERROR: ffmpeg could not start."); });
+        p.on("close", function () {
+          $("bm-analyze").disabled = false;
+          var buf = Buf.concat(chunks), n = Math.floor(buf.length / 4);
+          if (n < BM.sr * 2) { out("ERROR: could not decode the audio.\n" + err.slice(0, 300)); return; }
+          BM.samples = new Float32Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + n * 4));
+          out("Finding beats...");
+          setTimeout(function () { run(0); }, 20);
+        });
+      });
+    };
+    $("bm-half").onclick = function () { if (BM.res) run(BM.res.trackBpm / 2); };
+    $("bm-double").onclick = function () { if (BM.res) run(BM.res.trackBpm * 2); };
+    $("bm-prev").onclick = function () { BM.down = (BM.down + 3) % 4; show(); };
+    $("bm-next").onclick = function () { BM.down = (BM.down + 1) % 4; show(); };
+    document.querySelectorAll(".bm-beat").forEach(function (el) {
+      el.onclick = function () { BM.on[el.dataset.b] = !BM.on[el.dataset.b]; bmSave(); show(); };
+    });
+
+    $("bm-create").onclick = function () {
+      var r = BM.res; if (!r) return;
+      var parts = [];
+      r.times.forEach(function (t, i) { var b = beatNo(i); if (BM.on[b]) parts.push((BM.info.inP + t).toFixed(4) + "," + b + "," + COL[b]); });
+      out("Creating " + parts.length + " markers...");
+      $("bm-create").disabled = true;
+      evalScript("abm_create(" + jsStr(parts.join(";")) + "," + chk("bm-replace") + ")", function (res) {
+        $("bm-create").disabled = false;
+        if (!res || res.indexOf("OK|") !== 0) { out(res || "No answer from Premiere."); return; }
+        var p = res.split("|");
+        out(p[1] + " markers created ✓" + (+p[2] ? " (" + p[2] + " old markers removed)" : "") +
+            (+p[3] ? "\nNote: marker colours could not be set on this Premiere version." : "") +
+            "\nNext: Beat Edit tab.");
+      });
+    };
+    $("bm-remove").onclick = function () {
+      evalScript("abm_remove()", function (res) {
+        if (!res || res.indexOf("OK|") !== 0) { out(res || "No answer from Premiere."); return; }
+        out(res.split("|")[1] + " markers removed from the clip.");
+      });
+    };
+    show();
+  })();
+</script>
+</body>
+</html>
