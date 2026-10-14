@@ -10,6 +10,11 @@ put beat markers on your music, auto-edit your looks to the beat and batch-expor
 | **3 · Beat Edit** | Lays the selected look clips onto the music's beat markers: random speed range, cuts every 2/4/6 markers, cuts on strong beats, alternates close/wide shots, uses every clip at least once, fills the song from start to end. |
 | **4 · Export** | Every block of back-to-back clips on a track becomes its own video and is queued in Adobe Media Encoder (`brand_1`, `brand_2`, …). |
 
+> [!WARNING]
+> **Pose Cut is still in development (beta).** It can miss good poses or keep shaky moments.
+> For now I recommend picking your poses manually and using aEdit from **Beat Marker** onward –
+> Beat Marker, Beat Edit and Export are ready to use. Feedback on Pose Cut is very welcome via [Issues](../../issues).
+
 ## Install (Windows)
 
 **Option A – zip (simplest)**
