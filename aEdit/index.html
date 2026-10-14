@@ -68,6 +68,9 @@
   input[type=text] { flex:1; min-width:0; background:var(--panel); color:#fff; border:1px solid #444; padding:4px 6px; }
   button.mini { flex:0 0 auto; padding:4px 9px; font-size:11px; background:#3a3a3a; }
 
+  #support { margin-left:auto; font-size:11px; color:#ff8fb1; text-decoration:none; padding:3px 9px; border:1px solid rgba(255,120,170,.45);
+             border-radius:12px; box-shadow:0 0 10px -4px rgba(255,100,160,.7); transition:box-shadow .2s, color .2s; }
+  #support:hover { color:#fff; box-shadow:0 0 14px -2px rgba(255,100,160,.9); }
   /* ================= GLOW THEME ================= */
   :root { --bg:#0f1116; --panel:#161922; --line:#262b38; --text:#d9dde7; --dim:#7d8496;
           --accent:#3a8dff; --accent2:#22d3ee; --glow:rgba(58,141,255,.55); --keep:#2fe08a; --drop:#ff4d6d; }
@@ -122,7 +125,7 @@
 </style>
 </head>
 <body>
-  <header><h1>aEdit</h1><span>by talha0ff</span></header>
+  <header><h1>aEdit</h1><span>by talha0ff</span><a href="#" id="support" title="aEdit is free - support its development">♥ Support</a></header>
   <div id="ff-banner" style="display:none;margin:0 0 10px;padding:9px 10px;border:1px solid rgba(255,190,80,.45);border-radius:6px;background:rgba(255,170,40,.08);box-shadow:0 0 14px -6px rgba(255,170,40,.6)">
     <div style="color:#ffd28a;margin-bottom:6px">aEdit needs <b>ffmpeg</b> (free, ~80 MB, one time) for Pose Cut, Beat Marker and Beat Edit.</div>
     <div class="btns" style="margin-top:0"><button id="ff-get">Download ffmpeg</button></div>
@@ -268,6 +271,13 @@
   evalScript('$.evalFile("' + EXT + '/host/beat.jsx")');
 
   function $(id) { return document.getElementById(id); }
+  // open the support page in the default browser (not inside the panel)
+  $("support").onclick = function (e) {
+    e.preventDefault();
+    var url = "https://github.com/sponsors/talha00ff";
+    try { if (window.cep && window.cep.util && window.cep.util.openURLInDefaultBrowser) { window.cep.util.openURLInDefaultBrowser(url); return; } } catch (er) {}
+    try { require("child_process").exec((/Mac/.test(navigator.platform) ? "open " : 'start "" ') + '"' + url + '"'); } catch (er2) {}
+  };
   function chk(id) { return $(id).checked ? 1 : 0; }
   function jsStr(s) { return '"' + String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"'; }
 
