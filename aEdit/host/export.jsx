@@ -43,20 +43,27 @@ function aex__isAdj(clip) {
 }
 
 // Returns blocks for the given track (1-based index), merging clips whose gap <= gapSec.
-function aex_findBlocks(trackIndex, gapSec, minLenSec) {
+/* Blocks are found on ALL video tracks together, so a logo / graphic on an upper track extends its video.
+   Skipped: hidden tracks (eye off), disabled clips and adjustment layers (they span everything). */
+function aex_findBlocks(gapSec, minLenSec) {
     var seq = app.project.activeSequence;
     if (!seq) return aex__json({ error: "No active sequence." });
     var tracks = seq.videoTracks;
-    if (trackIndex < 1 || trackIndex > tracks.numTracks)
-        return aex__json({ error: "Track V" + trackIndex + " does not exist." });
-
-    var track = tracks[trackIndex - 1];
-    var items = [];
-    for (var i = 0; i < track.clips.numItems; i++) {
-        var c = track.clips[i];
-        if (aex__isAdj(c)) continue;
-        items.push({ s: aex__secs(c.start), e: aex__secs(c.end) });
+    var items = [], used = [], hidden = [];
+    for (var t = 0; t < tracks.numTracks; t++) {
+        var track = tracks[t], off = false;
+        try { off = track.isMuted(); } catch (eM) {}
+        if (off) { if (track.clips.numItems) hidden.push("V" + (t + 1)); continue; }
+        var n = 0;
+        for (var i = 0; i < track.clips.numItems; i++) {
+            var c = track.clips[i], dis = false;
+            try { dis = c.disabled; } catch (eD) {}
+            if (dis || aex__isAdj(c)) continue;
+            items.push({ s: aex__secs(c.start), e: aex__secs(c.end) }); n++;
+        }
+        if (n) used.push("V" + (t + 1));
     }
+    if (!items.length) return aex__json({ error: "No visible clips found (all tracks hidden or empty)." });
     items.sort(function (a, b) { return a.s - b.s; });
 
     var blocks = [];
@@ -77,7 +84,7 @@ function aex_findBlocks(trackIndex, gapSec, minLenSec) {
         if (b.e - b.s < minLenSec) continue;
         out.push({ start: b.s, end: b.e, clips: b.n, len: b.e - b.s, startTC: aex__tc(b.s, fps), endTC: aex__tc(b.e, fps) });
     }
-    return aex__json({ sequence: seq.name, fps: fps, blocks: out });
+    return aex__json({ sequence: seq.name, fps: fps, blocks: out, tracks: used.join(", "), hidden: hidden.join(", ") });
 }
 
 function aex_pickPreset() {

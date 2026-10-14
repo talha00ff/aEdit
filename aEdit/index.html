@@ -224,9 +224,8 @@
 
   <!-- ============ EXPORT ============ -->
   <section class="page" id="p-export">
-    <div class="hint" style="margin-top:0">Each group of back-to-back clips on the track is one video. Delete the empty takes between your edits, scan, and every group is queued in Media Encoder as its own file.</div>
+    <div class="hint" style="margin-top:0">Each group of back-to-back clips is one video – all video tracks count together (logos, titles on upper tracks too). Tracks with the eye switched off are ignored. Delete the empty takes between your edits, scan, and every group is queued in Media Encoder as its own file.</div>
     <div class="row" style="margin-top:10px">
-      <label>Track V <input id="ex-track" type="number" value="1" min="1"></label>
       <label>Merge gap s <input id="ex-gap" type="number" value="0.5" min="0" step="0.1"></label>
       <label>Min length s <input id="ex-min" type="number" value="1" min="0" step="0.5"></label>
     </div>
@@ -586,7 +585,7 @@
 
   /* =================== EXPORT =================== */
   (function () {
-    var EX = { blocks: [], preset: "", outdir: "" }, KEYS = ["ex-track", "ex-gap", "ex-min", "ex-base", "ex-start"];
+    var EX = { blocks: [], preset: "", outdir: "" }, KEYS = ["ex-gap", "ex-min", "ex-base", "ex-start"];
     try {
       var s = JSON.parse(localStorage.getItem("aedit.export") || "{}");
       KEYS.forEach(function (k) { if (s[k] !== undefined) { var el = $(k); if (el.type === "checkbox") el.checked = s[k]; else el.value = s[k]; } });
@@ -680,12 +679,13 @@
 
     $("ex-scan").onclick = function () {
       exSave(); out("Scanning...");
-      var t = parseInt($("ex-track").value, 10) || 1, g = parseFloat($("ex-gap").value) || 0, m = parseFloat($("ex-min").value) || 0;
-      evalScript("aex_findBlocks(" + t + "," + g + "," + m + ")", function (r) {
+      var g = parseFloat($("ex-gap").value) || 0, m = parseFloat($("ex-min").value) || 0;
+      evalScript("aex_findBlocks(" + g + "," + m + ")", function (r) {
         var d = parse(r); if (!d) return;
         if (d.error) return out("ERROR: " + d.error);
         EX.blocks = d.blocks.map(function (b) { b.on = true; return b; });
-        out(EX.blocks.length + " videos found in \"" + d.sequence + "\" (V" + t + "). Untick any you don't want.");
+        out(EX.blocks.length + " videos found in \"" + d.sequence + "\".\nTracks used: " + (d.tracks || "-") +
+            (d.hidden ? "  ·  hidden (ignored): " + d.hidden : "") + "\nUntick any you don't want.");
         render();
       });
     };
