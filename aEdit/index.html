@@ -255,7 +255,14 @@
     ["pc-out", "out", "ex-out", "bm-out"].forEach(function (id) { var o = document.getElementById(id); if (o) o.textContent = "ERROR (panel): " + msg + (line ? " (line " + line + ")" : ""); });
   };
   function evalScript(code, cb) { window.__adobe_cep__.evalScript(code, cb || function(){}); }
-  var EXT = window.__adobe_cep__.getSystemPath("extension").replace(/\\/g, "/");
+  // CEP returns the extension folder as a URI ("file:///C:/Users/..."); turn it into a normal path for Node / ffmpeg
+  var EXT = (function () {
+    var p = window.__adobe_cep__.getSystemPath("extension");
+    try { p = decodeURI(p); } catch (e) {}
+    p = p.replace(/\\/g, "/").replace(/^file:\/\//i, "");
+    if (/^\/[A-Za-z]:\//.test(p)) p = p.slice(1);      // "/C:/..." -> "C:/..."
+    return p;
+  })();
   evalScript('$.evalFile("' + EXT + '/host/main.jsx")');
   evalScript('$.evalFile("' + EXT + '/host/export.jsx")');
   evalScript('$.evalFile("' + EXT + '/host/beat.jsx")');
@@ -308,6 +315,7 @@
   (function ffmpegCheck() {
     if (!fs) return;
     var have = [EXT + "/bin/ffmpeg.exe", USERDIR + "/bin/ffmpeg.exe"].some(function (f) { try { return fs.existsSync(f); } catch (e) { return false; } });
+    if (!have) { try { have = cp.spawnSync("ffmpeg", ["-version"], { windowsHide: true, timeout: 5000 }).status === 0; } catch (e) {} }
     if (have) return;
     $("ff-banner").style.display = "block";
     $("ff-get").onclick = function () {
