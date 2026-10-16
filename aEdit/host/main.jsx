@@ -368,7 +368,46 @@ function bk_setShots(str) {
 }
 
 /* ---------- on kontrol ---------- */
-function bk_preview(beatOpts, perClip, useAll) {
+/* ---------- birden fazla parca ----------
+   A clip gives 1 part below 3 s, 2 parts for 3-7 s, 3 parts from 7 s up (source length).
+   Each part gets its own slice of the clip (part 1 from the start, part 2 after it...), so parts never repeat
+   and stay in source order. If the music is too short for all parts, extra parts are dropped first. */
+function bk_partsFor(len) { return len < 3 ? 1 : (len < 7 ? 2 : 3); }
+function bk_partQuota(c, partsOn, M, minOpt) {
+    var q = {}, total = 0, i, k;
+    for (i = 0; i < c.keys.length; i++) { k = c.keys[i]; q[k] = partsOn ? bk_partsFor(c.groups[k].maxLen) : 1; total += q[k]; }
+    var dropped = 0;
+    while (M > 0 && total * minOpt > M) {
+        var best = null;
+        for (i = 0; i < c.keys.length; i++) {
+            k = c.keys[i];
+            if (q[k] > 1 && (!best || q[k] > q[best] || (q[k] === q[best] && c.groups[k].maxLen < c.groups[best].maxLen))) best = k;
+        }
+        if (!best) break;
+        q[best]--; total--; dropped++;
+    }
+    return { q: q, total: total, dropped: dropped };
+}
+function bk_expandParts(c, partsOn, M, minOpt) {
+    var pq = bk_partQuota(c, partsOn, M, minOpt), groups = {}, keys = [];
+    for (var i = 0; i < c.keys.length; i++) {
+        var k = c.keys[i], g = c.groups[k], q = pq.q[k], shared = [];
+        var best = g.items[0];
+        for (var z = 1; z < g.items.length; z++) if (g.items[z].outP - g.items[z].inP > best.outP - best.inP) best = g.items[z];
+        var L = best.outP - best.inP;
+        for (var j = 0; j < q; j++) {
+            var uk = q > 1 ? k + "#" + j : k, za = best.inP + j * L / q, zb = best.inP + (j + 1) * L / q;
+            groups[uk] = { pi: g.pi, items: q > 1 ? [{ inP: za, outP: zb, ti: best.ti }] : g.items, full: g.items,
+                           uses: shared, ord: g.ord, rank: g.rank, maxLen: q > 1 ? zb - za : g.maxLen,
+                           parent: k, part: j, chrono: g.rank * 10 + j };
+            keys.push(uk);
+        }
+    }
+    c.groups = groups; c.keys = keys; c.partsDropped = pq.dropped;
+    return c;
+}
+
+function bk_preview(beatOpts, perClip, useAll, partsOn) {
     try {
         var seq = app.project.activeSequence;
         if (!seq) return "No active sequence.";
@@ -386,11 +425,18 @@ function bk_preview(beatOpts, perClip, useAll) {
         var avg = sum / opts.length;
         out.push("Music: " + mk.name + " (" + (mk.en - mk.st).toFixed(1) + " s, " + mk.count + " markers)");
         out.push("Clips needed to fill the music: min " + Math.ceil(M / mx) + ", comfortable " + Math.ceil(M / avg));
+        var nUnits = c.keys.length;
+        if (Number(partsOn) === 1 && !BK_SPLIT.on && nUnits) { var mnA = 1e9; for (var jA = 0; jA < opts.length; jA++) mnA = Math.min(mnA, opts[jA]); nUnits = bk_partQuota(c, true, M, mnA).total; }
         if (c.keys.length === 0) out.push("No look clips selected yet.");
-        else if (c.keys.length < Math.ceil(M / mx)) out.push("WARNING: Too few clips. Turn on slow-down or second parts.");
-        else if (c.keys.length < Math.ceil(M / avg)) out.push("Enough, but tight: longer intervals will be used more.");
+        else if (nUnits < Math.ceil(M / mx)) out.push("WARNING: Too few clips. Turn on slow-down or second parts.");
+        else if (nUnits < Math.ceil(M / avg)) out.push("Enough, but tight: longer intervals will be used more.");
         else out.push("Clip count is fine.");
         if (mk.accents.length) out.push("Strong-beat markers: " + mk.accents.length + ".");
+        if (Number(partsOn) === 1 && !BK_SPLIT.on && c.keys.length) {
+            var mn0 = 1e9; for (var j0 = 0; j0 < opts.length; j0++) mn0 = Math.min(mn0, opts[j0]);
+            var pq = bk_partQuota(c, true, M, mn0);
+            out.push("Parts from longer clips: " + pq.total + " parts from " + c.keys.length + " clips" + (pq.dropped ? " (" + pq.dropped + " extra parts dropped - music too short)" : "") + ".");
+        }
         if (Number(useAll) === 1 && c.keys.length) {
             var mn = 1e9; for (var j = 0; j < opts.length; j++) mn = Math.min(mn, opts[j]);
             if (c.keys.length * mn <= M) out.push("Use every clip: OK, all " + c.keys.length + " clips fit.");
@@ -404,7 +450,7 @@ function bk_preview(beatOpts, perClip, useAll) {
 /* ---------- ana islem ----------
    slowPct, fastPct (hiz araligi), beatOpts("2,4,6"), removeAudio, disableSources, perClip,
    accent (guclu vurus), openClose (acilis/kapanis uzun), stretch (yavaslat), reuse (ikinci parca), minSpeedPct */
-function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip, accent, openClose, stretch, reuse, minSpeedPct, alternate, useAll) {
+function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip, accent, openClose, stretch, reuse, minSpeedPct, alternate, useAll, chrono, partsOn) {
     var log = [];
     try {
         app.enableQE();
@@ -435,6 +481,19 @@ function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip
             return false;
         };
         if (accent && !mk.accents.length) log.push("Note: Marker colours unreadable, strong-beat option skipped.");
+        // longer clips -> several parts (each part is its own "clip" from here on); chronological = timeline order
+        chrono = Number(chrono) === 1; partsOn = Number(partsOn) === 1;
+        var clipTotal = keys.length;
+        if (!BK_SPLIT.on) {
+            bk_expandParts(c, partsOn, M, minOpt);
+            groups = c.groups; keys = c.keys;
+            if (partsOn && keys.length > clipTotal) log.push("Parts: " + keys.length + " parts from " + clipTotal + " clips (3-7 s: 2, 7 s+: 3)" + (c.partsDropped ? ", " + c.partsDropped + " extra parts dropped (music too short)" : "") + ".");
+        }
+        var parentOf = function (kx) { return (groups[kx] && groups[kx].parent) || kx; };
+        if (chrono) {
+            if (Number(alternate) === 1) log.push("Note: Chronological edit - close/wide alternation is off (timeline order wins).");
+            alternate = 0;
+        }
         // "use every clip": keep enough markers back so every selected clip gets at least allUnit markers
         useAll = Number(useAll) === 1;
         var allUnit = (keys.length * minOpt <= M) ? minOpt : Math.max(1, Math.floor(M / keys.length));
@@ -480,7 +539,7 @@ function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip
         var touched = [], lastRank = -99, lastKey = null;
         // yakin / uzak plan sirasi
         alternate = Number(alternate) === 1;
-        var shotOf = function (kx) { var r = BK_SHOTS[kx]; return (r && (r.wide === 0 || r.wide === 1)) ? r.wide : -1; };
+        var shotOf = function (kx) { var r = BK_SHOTS[parentOf(kx)]; return (r && (r.wide === 0 || r.wide === 1)) ? r.wide : -1; };
         var shotKnown = 0;
         if (alternate) { for (var sk = 0; sk < keys.length; sk++) if (shotOf(keys[sk]) !== -1) shotKnown++; }
         if (alternate && shotKnown < 2) { log.push("Note: No shot analysis yet - press 'Analyze shots' first. Close/wide order skipped."); alternate = false; }
@@ -490,6 +549,8 @@ function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip
         var pickPart = function (grp, need) {
             var cands = [];
             for (var j = 0; j < grp.items.length; j++) if (grp.items[j].outP - grp.items[j].inP >= need - fd / 2) cands.push(grp.items[j]);
+            if (!cands.length && grp.full && grp.full !== grp.items)
+                for (var j2 = 0; j2 < grp.full.length; j2++) if (grp.full[j2].outP - grp.full[j2].inP >= need - fd / 2) cands.push(grp.full[j2]);
             if (!cands.length) return null;
             for (var tr = 0; tr < 12; tr++) {
                 var part = cands[Math.floor(Math.random() * cands.length)];
@@ -535,8 +596,9 @@ function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip
             }
             if (!bk_setSpeed(ti_idx, times[idx], fd, spd, vt)) speedFail++;
             if (!bk_enforceEnd(seq, ti_idx, vt, at, times[idx], times[idx + n], fd)) endFail++;
-            grp.uses.push([srcIn, srcIn + need]);
-            if (Math.abs(grp.rank - lastRank) === 1) adjForced++;
+            grp.uses.push([srcIn, srcIn + need]);   // shared by all parts of one clip -> parts never overlap
+            grp.placedN = (grp.placedN || 0) + 1;
+            if (!chrono && Math.abs(grp.rank - lastRank) === 1) adjForced++;
             if (spd < slowEff - 0.001) slowed++;
             if (spd < spMin) spMin = spd; if (spd > spMax) spMax = spd;
             if (round > 1) reused++;
@@ -634,14 +696,20 @@ function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip
                     wantShot = (Math.abs(nWide - nClose) <= 1) ? 1 : (nWide > nClose ? 1 : 0);
                 } else wantShot = 1 - lastShot;
             }
+            // clips with many unused parts go a bit earlier, so their parts spread out instead of piling up at the end
+            var leftParts = {};
+            for (var lp0 = 0; lp0 < keys.length; lp0++) if (!used[keys[lp0]]) { var pp0 = parentOf(keys[lp0]); leftParts[pp0] = (leftParts[pp0] || 0) + 1; }
             for (var g0 = 0; g0 < pool.length; g0++) {
                 var kk = pool[g0];
                 if (used[kk] || kk === lastKey) continue;
-                jit[kk] = groups[kk].maxLen + Math.random() * 0.6;
+                jit[kk] = groups[kk].maxLen + Math.random() * Math.max(0.6, groups[kk].maxLen * 0.6)   // loose length preference, real variety
+                          - (leftParts[parentOf(kk)] - 1) * 1.5;
                 var adj = Math.abs(groups[kk].rank - lastRank) === 1 ? 2 : 0;
                 var shk = shotOf(kk);
                 var same = (wantShot !== -1 && shk !== -1 && shk !== wantShot) ? 1 : 0;
-                tier[kk] = adj + same;
+                // parts of the same clip should not follow each other (random mode)
+                var sib = (lastKey && parentOf(kk) === parentOf(lastKey)) ? 4 : 0;
+                tier[kk] = adj + same + sib;
                 cand.push(kk);
             }
             var longFirst = openClose && (placed === 0);
@@ -649,7 +717,8 @@ function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip
                 if (tier[x] !== tier[y]) return tier[x] - tier[y];
                 return longFirst ? jit[y] - jit[x] : jit[x] - jit[y];
             };
-            cand.sort(byTierLen);
+            if (chrono) cand.sort(function (x, y) { return groups[x].chrono - groups[y].chrono; });   // timeline order, parts in a row
+            else cand.sort(byTierLen);
             var order = cand;
 
             // once normal hiz, sonra (izin varsa) kademeli yavaslatma
@@ -665,7 +734,7 @@ function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip
             for (var si = 0; si < speeds.length && !done; si++) {
                 for (var o = 0; o < ns.length && !done; o++) {
                     var n = ns[o];
-                    if (openClose && idx + n === M && si === 0) {
+                    if (!chrono && openClose && idx + n === M && si === 0) {
                         // kapanis: en uzun klibi one al
                         order.sort(function (x, y) { return (tier[x] - tier[y]) || (jit[y] - jit[x]); });
                     }
@@ -673,7 +742,7 @@ function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip
                         var k = order[g];
                         if (used[k]) continue;
                         // bu klibi bu araliga koyarsak kalanlar muzigi hala doldurabilir mi?
-                        if (si === 0 && o < ns.length - 1 && !feasibleAfter(k, n)) continue;
+                        if (!chrono && si === 0 && o < ns.length - 1 && !feasibleAfter(k, n)) continue;
                         var res = placeOne(k, n, speeds[si]);
                         if (res === true) done = true;
                         else if (res === null) { used[k] = true; usedCount++; }
@@ -692,7 +761,7 @@ function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip
             var lp = lastPlace, startT = times[lp.idx];
             var vrm = bk_findClipAt(vt, startT, fd); if (vrm) { try { vrm.remove(false, false); } catch (x1) {} }
             var arm = bk_findClipAt(at, startT, fd); if (arm) { try { arm.remove(false, false); } catch (x2) {} }
-            groups[lp.k].uses.pop();
+            groups[lp.k].uses.pop(); groups[lp.k].placedN--;
             placed--; idx = lp.idx; lastRank = lp.prevRank; lastKey = lp.prevKey;
             used[lp.k] = false; usedCount--;
             var okS = false;
@@ -713,7 +782,7 @@ function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip
 
         log.unshift("Done: " + placed + " clips placed on V" + (ti_idx + 1) + ".");
         log.push("Music: " + mk.name + " (" + mk.count + " markers, " + bk_tc(mk.st) + " - " + bk_tc(mk.en) + ")");
-        log.push("Selected clips: " + keys.length + ", used: " + placed + (reused ? " (" + reused + " second parts)" : ""));
+        log.push("Selected clips: " + clipTotal + (keys.length > clipTotal ? " (" + keys.length + " parts)" : "") + ", placed: " + placed + (reused ? " (" + reused + " repeats)" : "") + (chrono ? " - chronological order" : ""));
         // dogrulama: kesim noktalarini timeline'dan oku
         var starts = [];
         for (var vi = 0; vi < vt.clips.numItems; vi++) starts.push(bk_secs(vt.clips[vi].start));
@@ -730,8 +799,12 @@ function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip
         if (alternate) log.push("Close/wide: shot type changed on " + altOk + " of " + altTotal + " cuts.");
         if (useAll) {
             var unused = 0;
-            for (var uk2 = 0; uk2 < keys.length; uk2++) if (!groups[keys[uk2]].uses.length) unused++;
-            log.push(unused ? "WARNING: " + unused + " of " + keys.length + " clips are not in the edit (too short or not enough beats)." : "Every selected clip is in the edit.");
+            for (var uk2 = 0; uk2 < keys.length; uk2++) if (!groups[keys[uk2]].placedN) unused++;
+            var unusedClips = 0, seenP = {};
+            for (var uk3 = 0; uk3 < keys.length; uk3++) { var pk = parentOf(keys[uk3]); if (!(pk in seenP)) seenP[pk] = 0; if (groups[keys[uk3]].placedN) seenP[pk] = 1; }
+            for (var pk2 in seenP) if (seenP.hasOwnProperty(pk2) && !seenP[pk2]) unusedClips++;
+            log.push(unusedClips ? "WARNING: " + unusedClips + " of " + clipTotal + " clips are not in the edit (too short or not enough beats)."
+                                 : "Every selected clip is in the edit." + (unused ? " (" + unused + " extra parts could not be placed.)" : ""));
         }
         if (spMax > 0) log.push("Speeds: " + Math.round(spMin * 100) + "%" + (spMax > spMin ? " - " + Math.round(spMax * 100) + "%" : ""));
         var COLN = ["green", "red", "purple", "orange", "yellow", "white", "blue", "cyan"];

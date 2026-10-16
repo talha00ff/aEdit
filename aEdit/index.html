@@ -204,6 +204,8 @@
     <h2>Edit</h2>
     <label><input id="accent" type="checkbox" checked> Cut on strong beats (beat 1)</label>
     <label><input id="openclose" type="checkbox" checked> Long clips to open and close</label>
+    <label><input id="chrono" type="checkbox"> Chronological edit (clips in timeline order)</label>
+    <label><input id="parts" type="checkbox" checked> More parts from longer clips <span style="color:var(--dim)">(3–7 s: 2 · 7 s+: 3)</span></label>
     <label><input id="useall" type="checkbox" checked> Use every clip at least once</label>
     <label><input id="alternate" type="checkbox" checked> Alternate close and wide shots</label>
     <div class="row sub">
@@ -291,7 +293,7 @@
   try { var lastTab = localStorage.getItem("aedit.tab"); if (lastTab) document.querySelector('.tab[data-p="' + lastTab + '"]').click(); } catch (e) {}
 
   /* remember settings */
-  var FIELDS = ["slow","fast","minspeed","stretch","reuse","accent","openclose","alternate","useall","thresh","perclip","noaudio","disable","pc-sym","pc-pad","pc-min","pc-max","pc-spd","pc-close"];
+  var FIELDS = ["slow","fast","minspeed","stretch","reuse","accent","openclose","alternate","useall","chrono","parts","thresh","perclip","noaudio","disable","pc-sym","pc-pad","pc-min","pc-max","pc-spd","pc-close"];
   function beats() {
     return Array.prototype.slice.call(document.querySelectorAll(".beat"))
       .filter(function (c) { return c.checked; }).map(function (c) { return c.value; }).join(",");
@@ -560,22 +562,24 @@
     });
   }
   $("analyze").onclick = function () { save(); analyzeShots(); };
+  function chronoUI() { var on = $("chrono").checked; $("alternate").parentNode.style.opacity = on ? .45 : 1; $("alternate").parentNode.title = on ? "Off in chronological mode" : ""; }
+  $("chrono").addEventListener("change", function () { chronoUI(); save(); }); chronoUI();
   $("thresh").onchange = function () { save(); if (SHOT.items.length) classifyAndSend(function (m) { $("out").textContent = m; }); };
 
   $("check").onclick = function () {
     save(); $("out").textContent = "Checking...";
-    evalScript('bk_preview("' + beats() + '",' + chk("perclip") + ',' + chk("useall") + ')', function (res) { $("out").textContent = res || "No answer."; });
+    evalScript('bk_preview("' + beats() + '",' + chk("perclip") + ',' + chk("useall") + ',' + chk("parts") + ')', function (res) { $("out").textContent = res || "No answer."; });
   };
   function doRun(btn) {
     var slow = parseFloat($("slow").value) || 60, fast = parseFloat($("fast").value) || slow, minsp = parseFloat($("minspeed").value) || 40;
     btn.disabled = true; $("out").textContent = "Working...";
     var call = 'bk_run(' + slow + ',' + fast + ',"' + beats() + '",' + chk("noaudio") + ',' + chk("disable") + ',' + chk("perclip") + ',' +
-               chk("accent") + ',' + chk("openclose") + ',' + chk("stretch") + ',' + chk("reuse") + ',' + minsp + ',' + chk("alternate") + ',' + chk("useall") + ')';
+               chk("accent") + ',' + chk("openclose") + ',' + chk("stretch") + ',' + chk("reuse") + ',' + minsp + ',' + chk("alternate") + ',' + chk("useall") + ',' + chk("chrono") + ',' + chk("parts") + ')';
     evalScript(call, function (res) { $("out").textContent = res || "No answer."; btn.disabled = false; });
   }
   $("run").onclick = function () {
     save(); var btn = this;
-    if (!$("alternate").checked) return doRun(btn);
+    if (!$("alternate").checked || $("chrono").checked) return doRun(btn);
     evalScript('bk_selSig(' + chk("perclip") + ')', function (sig) {
       if (SHOT.sig === sig && SHOT.items.length) return classifyAndSend(function () { doRun(btn); });
       btn.disabled = true;
