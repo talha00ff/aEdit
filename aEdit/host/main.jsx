@@ -463,7 +463,7 @@ function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip
         if (!(minSpeed > 0) || minSpeed > slow) minSpeed = Math.min(slow, 0.4);
         var fd = bk_frameDur(seq);
         var opts = bk_parseOpts(beatOpts);
-        if (opts.length === 0) return "ERROR: Pick at least one marker interval (2/4/6).";
+        if (opts.length === 0) return "ERROR: Pick at least one marker interval (1-12).";
         var maxOpt = 0, minOpt = 1e9;
         for (var mo = 0; mo < opts.length; mo++) { maxOpt = Math.max(maxOpt, opts[mo]); minOpt = Math.min(minOpt, opts[mo]); }
         accent = Number(accent) === 1; openClose = Number(openClose) === 1;
@@ -500,7 +500,7 @@ function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip
         if (useAll && allUnit < minOpt) log.push("Note: Many clips for this music - some clips get only " + allUnit + " marker(s) so every clip fits.");
 
         // klipler muzigi bu hizda dolduramiyorsa (ve yavaslatma acik, ikinci parca kapali): hizi hepsine esit dagitarak dusur
-        // bir klibin dolduracabilecegi en uzun secili aralik (2/4/6'dan biri)
+        // bir klibin dolduracabilecegi en uzun secili aralik (secili araliklardan biri)
         var capOf = function (len, sp) {
             var raw = Math.floor(len / (mk.beat * sp) + 0.05), best = 0;
             for (var z = 0; z < opts.length; z++) if (opts[z] <= raw && opts[z] > best) best = opts[z];

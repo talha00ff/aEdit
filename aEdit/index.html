@@ -71,6 +71,10 @@
   #support { margin-left:auto; font-size:11px; color:#ff8fb1; text-decoration:none; padding:3px 9px; border:1px solid rgba(255,120,170,.45);
              border-radius:12px; box-shadow:0 0 10px -4px rgba(255,100,160,.7); transition:box-shadow .2s, color .2s; }
   #support:hover { color:#fff; box-shadow:0 0 14px -2px rgba(255,100,160,.9); }
+  .beatgrid { display:grid !important; grid-template-columns:repeat(6, 1fr); gap:6px; }
+  .beatgrid .chip { justify-content:center; padding:4px 0; background:var(--panel); border:1px solid var(--line); border-radius:5px; cursor:pointer; }
+  .beatgrid .chip:hover { border-color:var(--accent); box-shadow:0 0 10px -4px var(--glow); }
+  .beatgrid-tools { display:flex; gap:6px; margin-top:6px; }
   /* ================= GLOW THEME ================= */
   :root { --bg:#0f1116; --panel:#161922; --line:#262b38; --text:#d9dde7; --dim:#7d8496;
           --accent:#3a8dff; --accent2:#22d3ee; --glow:rgba(58,141,255,.55); --keep:#2fe08a; --drop:#ff4d6d; }
@@ -190,11 +194,21 @@
       <label>Fastest % <input id="fast" type="number" value="65" min="1" max="1000"></label>
     </div>
     <label>Cut every N markers (random)</label>
-    <div class="row">
-      <label><input type="checkbox" class="beat" value="2" checked> 2</label>
-      <label><input type="checkbox" class="beat" value="4" checked> 4</label>
-      <label><input type="checkbox" class="beat" value="6" checked> 6</label>
+    <div class="row beatgrid">
+      <label class="chip"><input type="checkbox" class="beat" value="1"> 1</label>
+      <label class="chip"><input type="checkbox" class="beat" value="2" checked> 2</label>
+      <label class="chip"><input type="checkbox" class="beat" value="3"> 3</label>
+      <label class="chip"><input type="checkbox" class="beat" value="4" checked> 4</label>
+      <label class="chip"><input type="checkbox" class="beat" value="5"> 5</label>
+      <label class="chip"><input type="checkbox" class="beat" value="6" checked> 6</label>
+      <label class="chip"><input type="checkbox" class="beat" value="7"> 7</label>
+      <label class="chip"><input type="checkbox" class="beat" value="8"> 8</label>
+      <label class="chip"><input type="checkbox" class="beat" value="9"> 9</label>
+      <label class="chip"><input type="checkbox" class="beat" value="10"> 10</label>
+      <label class="chip"><input type="checkbox" class="beat" value="11"> 11</label>
+      <label class="chip"><input type="checkbox" class="beat" value="12"> 12</label>
     </div>
+    <div class="beatgrid-tools"><button class="mini" id="beat-even">2·4·6</button><button class="mini" id="beat-all">All</button><button class="mini" id="beat-none">None</button></div>
 
     <h2>Fill the music</h2>
     <label><input id="stretch" type="checkbox" checked> Slow clips down if they run short</label>
@@ -294,6 +308,7 @@
 
   /* remember settings */
   var FIELDS = ["slow","fast","minspeed","stretch","reuse","accent","openclose","alternate","useall","chrono","parts","thresh","perclip","noaudio","disable","pc-sym","pc-pad","pc-min","pc-max","pc-spd","pc-close"];
+  function setBeats(list) { document.querySelectorAll(".beat").forEach(function (c) { c.checked = list === "all" || list.indexOf(+c.value) >= 0; }); save(); }
   function beats() {
     return Array.prototype.slice.call(document.querySelectorAll(".beat"))
       .filter(function (c) { return c.checked; }).map(function (c) { return c.value; }).join(",");
@@ -310,6 +325,11 @@
       localStorage.setItem("aedit", JSON.stringify(s));
     } catch (e) {}
   }
+
+  $("beat-even").onclick = function () { setBeats([2, 4, 6]); };
+  $("beat-all").onclick = function () { setBeats("all"); };
+  $("beat-none").onclick = function () { setBeats([]); };
+  document.querySelectorAll(".beat").forEach(function (c) { c.addEventListener("change", save); });
 
   /* =================== POSE CUT =================== */
   var nodeReq = null; try { nodeReq = require; } catch (e) {}
