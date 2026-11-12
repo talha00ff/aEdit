@@ -150,6 +150,30 @@ function aex_queue(blocksJson, presetPath, outFolder, baseName, startNow) {
     return aex__json({ queued: queued, errors: errors });
 }
 
+/* Render ONE block directly in Premiere (no Media Encoder). Called once per block by the panel so it can show progress.
+   Premiere is busy (frozen) while a block renders. Returns {ok, path} or {error}. */
+function aex_renderOne(start, end, presetPath, outFolder, baseName, num) {
+    var seq = app.project.activeSequence;
+    if (!seq) return aex__json({ error: "No active sequence." });
+    if (!presetPath || !File(presetPath).exists) return aex__json({ error: "Preset not found." });
+    outFolder = outFolder.replace(/[\\\/]+$/, "");
+    if (!outFolder || !Folder(outFolder).exists) return aex__json({ error: "Output folder not found." });
+    if (typeof seq.exportAsMediaDirect !== "function") return aex__json({ error: "This Premiere version cannot render from a panel. Use Media Encoder." });
+    var oldIn = null, oldOut = null;
+    try { oldIn = seq.getInPointAsTime(); oldOut = seq.getOutPointAsTime(); } catch (e0) {}
+    var name = (baseName || seq.name).replace(/[\\\/:*?"<>|]/g, "_");
+    var sep = (Folder.fs === "Windows") ? "\\" : "/";
+    var path = outFolder + sep + name + "_" + num + aex__ext(presetPath);
+    var res;
+    try {
+        seq.setInPoint(start); seq.setOutPoint(end);
+        res = seq.exportAsMediaDirect(path, presetPath, 1);   // 1 = in to out
+    } catch (e) { res = e.toString(); }
+    try { if (oldIn) seq.setInPoint(oldIn.seconds); if (oldOut) seq.setOutPoint(oldOut.seconds); } catch (e2) {}
+    var ok = File(path).exists;
+    return aex__json(ok ? { ok: true, path: path } : { error: "Block " + num + ": " + (res || "render failed") });
+}
+
 // Jump playhead + set in/out to preview a block in the timeline
 function aex_gotoBlock(start, end) {
     var seq = app.project.activeSequence;
