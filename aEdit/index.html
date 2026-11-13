@@ -228,6 +228,27 @@
     </div>
     <div id="shots" class="shots"></div>
 
+    <h2>Speed ramp</h2>
+    <div class="row">
+      <label>Style
+        <select id="ramp" class="path" style="flex:0 0 auto;width:auto">
+          <option value="0">Off</option>
+          <option value="1">Smooth dip (fast · slow · fast)</option>
+          <option value="2">Slow into the cut</option>
+          <option value="3">Speed into the cut</option>
+          <option value="4">Whip burst (slow · fast · slow)</option>
+          <option value="5">Mix (random per clip)</option>
+        </select></label>
+    </div>
+    <div class="row">
+      <label>Strength
+        <select id="rampk" class="path" style="flex:0 0 auto;width:auto">
+          <option value="1">Subtle</option><option value="2" selected>Medium</option><option value="3">Strong</option>
+        </select></label>
+      <label>Ramp % of clips <input id="ramppct" type="number" value="50" min="0" max="100" step="10"></label>
+    </div>
+    <div class="hint" style="margin-top:2px">Only slowed clips of about 1 s or longer get a ramp. Each ramp is built from short slices (Premiere's Time Remapping can't be scripted), so the cut stays on the beat.</div>
+
     <h2>Other</h2>
     <label><input id="perclip" type="checkbox" checked> Treat every selected clip as its own video</label>
     <label><input id="noaudio" type="checkbox" checked> Remove the clips' own audio</label>
@@ -308,7 +329,7 @@
   try { var lastTab = localStorage.getItem("aedit.tab"); if (lastTab) document.querySelector('.tab[data-p="' + lastTab + '"]').click(); } catch (e) {}
 
   /* remember settings */
-  var FIELDS = ["slow","fast","minspeed","stretch","reuse","accent","openclose","alternate","useall","chrono","parts","thresh","perclip","noaudio","disable","pc-sym","pc-pad","pc-min","pc-max","pc-spd","pc-close"];
+  var FIELDS = ["slow","fast","minspeed","stretch","reuse","accent","openclose","alternate","useall","chrono","parts","ramp","rampk","ramppct","thresh","perclip","noaudio","disable","pc-sym","pc-pad","pc-min","pc-max","pc-spd","pc-close"];
   function setBeats(list) { document.querySelectorAll(".beat").forEach(function (c) { c.checked = list === "all" || list.indexOf(+c.value) >= 0; }); save(); }
   function beats() {
     return Array.prototype.slice.call(document.querySelectorAll(".beat"))
@@ -595,7 +616,7 @@
     var slow = parseFloat($("slow").value) || 60, fast = parseFloat($("fast").value) || slow, minsp = parseFloat($("minspeed").value) || 40;
     btn.disabled = true; $("out").textContent = "Working...";
     var call = 'bk_run(' + slow + ',' + fast + ',"' + beats() + '",' + chk("noaudio") + ',' + chk("disable") + ',' + chk("perclip") + ',' +
-               chk("accent") + ',' + chk("openclose") + ',' + chk("stretch") + ',' + chk("reuse") + ',' + minsp + ',' + chk("alternate") + ',' + chk("useall") + ',' + chk("chrono") + ',' + chk("parts") + ')';
+               chk("accent") + ',' + chk("openclose") + ',' + chk("stretch") + ',' + chk("reuse") + ',' + minsp + ',' + chk("alternate") + ',' + chk("useall") + ',' + chk("chrono") + ',' + chk("parts") + ',' + $("ramp").value + ',' + $("rampk").value + ',' + (parseFloat($("ramppct").value) || 0) + ')';
     evalScript(call, function (res) { $("out").textContent = res || "No answer."; btn.disabled = false; });
   }
   $("run").onclick = function () {

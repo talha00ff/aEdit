@@ -368,6 +368,86 @@ function bk_setShots(str) {
 }
 
 /* ---------- on kontrol ---------- */
+/* ---------- speed ramp ----------
+   Premiere's Time Remapping is not scriptable, so a ramp is built from short slices with changing constant speeds.
+   The clip keeps its length (beat sync) and its source window (same content); speeds never go above 100%,
+   so a slice can never run over the next clip while it is being placed.
+   style: 1 dip (fast-slow-fast) 2 slow into the cut 3 speed into the cut 4 whip burst (slow-fast-slow) 5 mix */
+function bk_rampCurve(style, u) {
+    if (style === 1) return Math.cos(2 * Math.PI * u);
+    if (style === 2) return Math.cos(Math.PI * u);
+    if (style === 3) return -Math.cos(Math.PI * u);
+    return -Math.cos(2 * Math.PI * u);
+}
+// frame counts and speeds of the slices; null when the clip is too short for a ramp
+function bk_rampPlan(D, base, fd, style, strength) {
+    var F = Math.round(D / fd), N = Math.min(10, Math.max(4, Math.round(D / 0.1)), Math.floor(F / 4));
+    if (N < 4 || base > 0.95) return null;
+    var k = strength === 1 ? 0.5 : (strength === 3 ? 1.4 : 0.9);
+    var fr = [], i, b = Math.floor(F / N), extra = F - b * N;
+    for (i = 0; i < N; i++) fr.push(b + (i < extra ? 1 : 0));
+    var g = [], cum = 0;
+    for (i = 0; i < N; i++) { var u = (cum + fr[i] / 2) / F; g.push(Math.pow(2, k * bk_rampCurve(style, u))); cum += fr[i]; }
+    // speeds: same source use as the constant speed (time-weighted mean = base), clamped to 12%..100%
+    var sp = [], fixed = [];
+    for (i = 0; i < N; i++) { sp.push(base); fixed.push(false); }
+    for (var it = 0; it < 8; it++) {
+        var want = base * F, got = 0, free = 0;
+        for (i = 0; i < N; i++) { if (fixed[i]) got += sp[i] * fr[i]; else free += g[i] * fr[i]; }
+        if (free <= 0) break;
+        var sc = (want - got) / free, changed = false;
+        for (i = 0; i < N; i++) {
+            if (fixed[i]) continue;
+            var v = g[i] * sc;
+            if (v > 1) { v = 1; fixed[i] = true; changed = true; }
+            else if (v < 0.12) { v = 0.12; fixed[i] = true; changed = true; }
+            sp[i] = v;
+        }
+        if (!changed) break;
+    }
+    return { frames: fr, speeds: sp };
+}
+// rebuild one placed clip as a ramp; returns the inner cut times (not real cuts) or null
+function bk_applyRamp(seq, vt, at, ti_idx, clip, fd, style, strength, touched) {
+    var T0 = bk_secs(clip.start), T1 = bk_secs(clip.end), base = 1, I = bk_secs(clip.inPoint), pi = clip.projectItem;
+    try { base = Number(clip.getSpeed()); } catch (e) {}
+    if (base > 5) base = base / 100;
+    var plan = bk_rampPlan(T1 - T0, base, fd, style, strength);
+    if (!plan || !pi) return null;
+    var totalSrc = (T1 - T0) * base;
+    if (!bk_setIO(pi, I, I + totalSrc, fd)) return null;          // source in/out must work before we touch the clip
+    // empty the slot first: a slowed slice grows to the right, and must not run into the rest of the old clip
+    var a0 = bk_findClipAt(at, T0, fd);
+    try { clip.remove(false, false); } catch (eR) { return null; }
+    if (a0) { try { a0.remove(false, false); } catch (eA) {} }
+    var inner = [], cumF = 0, srcA = I, cumSrcT = 0;
+    var put = function (sa, sb, t, d) {
+        if (!bk_setIO(pi, sa, sb, fd)) return false;
+        vt.overwriteClip(pi, t); touched.push(pi);
+        bk_setSpeed(ti_idx, t, fd, (sb - sa) / d, vt);
+        return bk_enforceEnd(seq, ti_idx, vt, at, t, t + d, fd);
+    };
+    for (var i = 0; i < plan.frames.length; i++) {
+        var t = T0 + cumF * fd, d = plan.frames[i] * fd;
+        cumSrcT += plan.speeds[i] * d;
+        var srcB = I + Math.min(cumSrcT, totalSrc);              // no frame rounding: smoother speed steps
+        if (i === plan.frames.length - 1) srcB = I + totalSrc;
+        if (srcB - srcA < fd) srcB = srcA + fd;                   // at least one source frame per slice
+        if (srcB - srcA > d) srcB = srcA + d;                     // never above 100%: the slice would run into the next clip
+        if (!put(srcA, srcB, t, d)) {
+            // something failed: fill the rest of the slot with one constant-speed piece, so no gap is left
+            var rest = T1 - t;
+            if (rest >= fd) { var ex = bk_findClipAt(vt, t, fd); if (ex) { try { ex.remove(false, false); } catch (eX) {} }
+                              put(srcA, I + totalSrc, t, rest); }
+            if (i > 0) inner.push(t);
+            return inner;
+        }
+        if (i > 0) inner.push(t);
+        cumF += plan.frames[i]; srcA = srcB;
+    }
+    return inner;
+}
+
 /* ---------- birden fazla parca ----------
    A clip gives 1 part below 3 s, 2 parts for 3-7 s, 3 parts from 7 s up (source length).
    Each part gets its own slice of the clip (part 1 from the start, part 2 after it...), so parts never repeat
@@ -450,7 +530,7 @@ function bk_preview(beatOpts, perClip, useAll, partsOn) {
 /* ---------- ana islem ----------
    slowPct, fastPct (hiz araligi), beatOpts("2,4,6"), removeAudio, disableSources, perClip,
    accent (guclu vurus), openClose (acilis/kapanis uzun), stretch (yavaslat), reuse (ikinci parca), minSpeedPct */
-function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip, accent, openClose, stretch, reuse, minSpeedPct, alternate, useAll, chrono, partsOn) {
+function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip, accent, openClose, stretch, reuse, minSpeedPct, alternate, useAll, chrono, partsOn, rampStyle, rampStrength, rampPct) {
     var log = [];
     try {
         app.enableQE();
@@ -771,6 +851,22 @@ function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip
             if (!okS) placeOne(lp.k, lp.n, lp.spd); // olmadiysa eski haline don
         }
 
+        // speed ramps on the slowed clips (after the edit is complete, so the beat layout is final)
+        var rampInner = [], rampN = 0;
+        rampStyle = Number(rampStyle) || 0; rampStrength = Number(rampStrength) || 2; rampPct = Number(rampPct); if (isNaN(rampPct)) rampPct = 50;
+        if (rampStyle > 0 && rampPct > 0) {
+            var snap = [];
+            for (var rq = 0; rq < vt.clips.numItems; rq++) snap.push(vt.clips[rq]);
+            for (var rq2 = 0; rq2 < snap.length; rq2++) {
+                if (Math.random() * 100 >= rampPct) continue;
+                var st = rampStyle === 5 ? 1 + Math.floor(Math.random() * 4) : rampStyle;
+                var inn = null;
+                try { inn = bk_applyRamp(seq, vt, at, ti_idx, snap[rq2], fd, st, rampStrength, touched); } catch (eRmp) {}
+                if (inn && inn.length) { rampN++; for (var ri = 0; ri < inn.length; ri++) rampInner.push(inn[ri]); }
+            }
+        }
+        var isInner = function (tt) { for (var ii = 0; ii < rampInner.length; ii++) if (Math.abs(rampInner[ii] - tt) < fd / 2) return true; return false; };
+
         // temizlik
         for (var q = 0; q < touched.length; q++) { try { touched[q].clearInPoint(); touched[q].clearOutPoint(); } catch (e3) {} }
         if (Number(removeAudio) === 1) {
@@ -785,7 +881,7 @@ function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip
         log.push("Selected clips: " + clipTotal + (keys.length > clipTotal ? " (" + keys.length + " parts)" : "") + ", placed: " + placed + (reused ? " (" + reused + " repeats)" : "") + (chrono ? " - chronological order" : ""));
         // dogrulama: kesim noktalarini timeline'dan oku
         var starts = [];
-        for (var vi = 0; vi < vt.clips.numItems; vi++) starts.push(bk_secs(vt.clips[vi].start));
+        for (var vi = 0; vi < vt.clips.numItems; vi++) { var sv = bk_secs(vt.clips[vi].start); if (!isInner(sv)) starts.push(sv); }
         starts.sort(function (x, y) { return x - y; });
         for (var cs2 = 1; cs2 < starts.length; cs2++) { cutTotal++; if (isAcc(starts[cs2])) cutAcc++; }
         var offBeat = 0;
@@ -797,6 +893,7 @@ function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip
         if (idx >= M) log.push("The edit covers the music from start to end.");
         else log.push("Note: Ran out of clips, edit ends at " + bk_tc(times[idx]) + " (music ends " + bk_tc(mk.en) + "). Turn on slow-down / second parts or select more clips.");
         if (alternate) log.push("Close/wide: shot type changed on " + altOk + " of " + altTotal + " cuts.");
+        if (rampStyle > 0) log.push("Speed ramps: " + rampN + " clips" + (rampN ? " (each ramp is a few short slices on the track)" : " - no slowed clip was long enough (needs about 1 s and a speed under 95%)") + ".");
         if (useAll) {
             var unused = 0;
             for (var uk2 = 0; uk2 < keys.length; uk2++) if (!groups[keys[uk2]].placedN) unused++;
