@@ -504,6 +504,7 @@ function bk_preview(beatOpts, perClip, useAll, partsOn) {
         for (var i = 0; i < opts.length; i++) { sum += opts[i]; mx = Math.max(mx, opts[i]); }
         var avg = sum / opts.length;
         out.push("Music: " + mk.name + " (" + (mk.en - mk.st).toFixed(1) + " s, " + mk.count + " markers)");
+        if (Number(perClip) !== 1 && !BK_SPLIT.on && c.selVideo.length > c.keys.length) out.push("WARNING: " + c.selVideo.length + " selected clips were merged into " + c.keys.length + " because they come from the same video file. Tick 'Treat every selected clip as its own video' to use them one by one.");
         out.push("Clips needed to fill the music: min " + Math.ceil(M / mx) + ", comfortable " + Math.ceil(M / avg));
         var nUnits = c.keys.length;
         if (Number(partsOn) === 1 && !BK_SPLIT.on && nUnits) { var mnA = 1e9; for (var jA = 0; jA < opts.length; jA++) mnA = Math.min(mnA, opts[jA]); nUnits = bk_partQuota(c, true, M, mnA).total; }
@@ -564,6 +565,7 @@ function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip
         // longer clips -> several parts (each part is its own "clip" from here on); chronological = timeline order
         chrono = Number(chrono) === 1; partsOn = Number(partsOn) === 1;
         var clipTotal = keys.length;
+        if (Number(perClip) !== 1 && !BK_SPLIT.on && c.selVideo.length > keys.length) log.push("WARNING: " + c.selVideo.length + " selected clips were merged into " + c.keys.length + " because they come from the same video file. Tick 'Treat every selected clip as its own video' to use them one by one.");
         if (!BK_SPLIT.on) {
             bk_expandParts(c, partsOn, M, minOpt);
             groups = c.groups; keys = c.keys;
