@@ -250,6 +250,8 @@
     <div class="hint" style="margin-top:2px">Only slowed clips of about 1 s or longer get a ramp. Each ramp is built from short slices (Premiere's Time Remapping can't be scripted), so the cut stays on the beat.</div>
 
     <h2>Other</h2>
+    <div class="row"><label>Output track
+      <select id="outtrack" class="path" style="flex:0 0 auto;width:auto"><option value="0">Auto (top empty track)</option><option value="1">V1</option><option value="2">V2</option><option value="3">V3</option><option value="4">V4</option><option value="5">V5</option><option value="6">V6</option><option value="7">V7</option><option value="8">V8</option><option value="9">V9</option><option value="10">V10</option><option value="11">V11</option><option value="12">V12</option></select></label></div>
     <label><input id="perclip" type="checkbox" checked> Treat every selected clip as its own video</label>
     <label><input id="noaudio" type="checkbox" checked> Remove the clips' own audio</label>
     <label><input id="disable" type="checkbox"> Hide the original clips</label>
@@ -329,7 +331,7 @@
   try { var lastTab = localStorage.getItem("aedit.tab"); if (lastTab) document.querySelector('.tab[data-p="' + lastTab + '"]').click(); } catch (e) {}
 
   /* remember settings */
-  var FIELDS = ["slow","fast","minspeed","stretch","reuse","accent","openclose","alternate","useall","chrono","parts","ramp","rampk","ramppct","thresh","perclip","noaudio","disable","pc-sym","pc-pad","pc-min","pc-max","pc-spd","pc-close"];
+  var FIELDS = ["slow","fast","minspeed","stretch","reuse","accent","openclose","alternate","useall","chrono","parts","ramp","rampk","ramppct","outtrack","thresh","perclip","noaudio","disable","pc-sym","pc-pad","pc-min","pc-max","pc-spd","pc-close"];
   function setBeats(list) { document.querySelectorAll(".beat").forEach(function (c) { c.checked = list === "all" || list.indexOf(+c.value) >= 0; }); save(); }
   function beats() {
     return Array.prototype.slice.call(document.querySelectorAll(".beat"))
@@ -616,7 +618,7 @@
     var slow = parseFloat($("slow").value) || 60, fast = parseFloat($("fast").value) || slow, minsp = parseFloat($("minspeed").value) || 40;
     btn.disabled = true; $("out").textContent = "Working...";
     var call = 'bk_run(' + slow + ',' + fast + ',"' + beats() + '",' + chk("noaudio") + ',' + chk("disable") + ',' + chk("perclip") + ',' +
-               chk("accent") + ',' + chk("openclose") + ',' + chk("stretch") + ',' + chk("reuse") + ',' + minsp + ',' + chk("alternate") + ',' + chk("useall") + ',' + chk("chrono") + ',' + chk("parts") + ',' + $("ramp").value + ',' + $("rampk").value + ',' + (parseFloat($("ramppct").value) || 0) + ')';
+               chk("accent") + ',' + chk("openclose") + ',' + chk("stretch") + ',' + chk("reuse") + ',' + minsp + ',' + chk("alternate") + ',' + chk("useall") + ',' + chk("chrono") + ',' + chk("parts") + ',' + $("ramp").value + ',' + $("rampk").value + ',' + (parseFloat($("ramppct").value) || 0) + ',' + $("outtrack").value + ')';
     evalScript(call, function (res) { $("out").textContent = res || "No answer."; btn.disabled = false; });
   }
   $("run").onclick = function () {

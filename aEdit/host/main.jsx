@@ -191,6 +191,14 @@ function bk_parseOpts(beatOpts) {
 }
 
 /* ---------- kanal ---------- */
+// true when no clip on the track overlaps [a, b]
+function bk_trackFree(track, a, b) {
+    for (var i = 0; i < track.clips.numItems; i++) {
+        var c = track.clips[i];
+        if (bk_secs(c.end) > a + 0.001 && bk_secs(c.start) < b - 0.001) return false;
+    }
+    return true;
+}
 function bk_findEmptyTrack(seq) {
     var n = Math.min(seq.videoTracks.numTracks, seq.audioTracks.numTracks);
     for (var i = n - 1; i >= 0; i--) {
@@ -531,7 +539,7 @@ function bk_preview(beatOpts, perClip, useAll, partsOn) {
 /* ---------- ana islem ----------
    slowPct, fastPct (hiz araligi), beatOpts("2,4,6"), removeAudio, disableSources, perClip,
    accent (guclu vurus), openClose (acilis/kapanis uzun), stretch (yavaslat), reuse (ikinci parca), minSpeedPct */
-function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip, accent, openClose, stretch, reuse, minSpeedPct, alternate, useAll, chrono, partsOn, rampStyle, rampStrength, rampPct) {
+function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip, accent, openClose, stretch, reuse, minSpeedPct, alternate, useAll, chrono, partsOn, rampStyle, rampStrength, rampPct, outTrack) {
     var log = [];
     try {
         app.enableQE();
@@ -603,8 +611,17 @@ function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip
         var pickSpeed = function () { return Math.round((slowEff + Math.random() * (baseSpeed - slowEff)) * 100) / 100; };
         var spMin = 9, spMax = 0, cutTotal = 0, cutAcc = 0, accPossible = 0;
 
-        // hedef kanal
-        var ti_idx = bk_findEmptyTrack(seq);
+        // hedef kanal: a track the user picked (must be free where the music is), or the top empty pair
+        outTrack = Number(outTrack) || 0;
+        var ti_idx = -1, pickedTrack = outTrack > 0;
+        if (pickedTrack) {
+            ti_idx = outTrack - 1;
+            if (ti_idx >= seq.videoTracks.numTracks || ti_idx >= seq.audioTracks.numTracks)
+                return "ERROR: Track V" + outTrack + " / A" + outTrack + " does not exist. Add tracks or choose Auto.";
+            var a0t = times[0] - fd, b0t = times[M] + fd;
+            if (!bk_trackFree(seq.videoTracks[ti_idx], a0t, b0t) || !bk_trackFree(seq.audioTracks[ti_idx], a0t, b0t))
+                return "ERROR: V" + outTrack + " / A" + outTrack + " is not empty under the music (" + bk_tc(times[0]) + " - " + bk_tc(times[M]) + "). Clear that part of the track, choose another one, or use Auto.";
+        } else ti_idx = bk_findEmptyTrack(seq);
         if (ti_idx < 0) {
             ti_idx = bk_addTrackPair(seq);
             seq = app.project.activeSequence;
@@ -872,7 +889,11 @@ function bk_run(slowPct, fastPct, beatOpts, removeAudio, disableSources, perClip
         // temizlik
         for (var q = 0; q < touched.length; q++) { try { touched[q].clearInPoint(); touched[q].clearOutPoint(); } catch (e3) {} }
         if (Number(removeAudio) === 1) {
-            for (var r = at.clips.numItems - 1; r >= 0; r--) { try { at.clips[r].remove(false, false); } catch (e4) {} }
+            for (var r = at.clips.numItems - 1; r >= 0; r--) {
+                var ar = at.clips[r], as = bk_secs(ar.start);
+                if (as < times[0] - fd || as > times[M] + fd) continue;
+                try { ar.remove(false, false); } catch (e4) {}
+            }
         }
         if (Number(disableSources) === 1) {
             for (var d = 0; d < c.selVideo.length; d++) { try { c.selVideo[d].disabled = true; } catch (e5) {} }
